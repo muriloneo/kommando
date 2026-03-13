@@ -1,0 +1,12 @@
+{
+  "idf.portWin": "COM3",
+  "idf.openOcdConfigs": [
+    "board/esp32c6-builtin.cfg"
+  ],
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32c6"
+  },
+  "idf.flashType": "UART",
+  "idf.monitorPort": "COM3",
+  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0-beta2\\esp-idf"
+}

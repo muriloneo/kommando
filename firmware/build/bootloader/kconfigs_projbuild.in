@@ -1,0 +1,6 @@
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/bootloader/Kconfig.projbuild"
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/esp_app_format/Kconfig.projbuild"
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/esp_rom/Kconfig.projbuild"
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/esp_tee/Kconfig.projbuild"
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/esptool_py/Kconfig.projbuild"
+source "C:/Espressif/.espressif/v6.0-beta2/esp-idf/components/partition_table/Kconfig.projbuild"

@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+C:/codes/esp32/kommando/firmware/build/CMakeFiles/bootloader
+C:/codes/esp32/kommando/firmware/build/CMakeFiles/bootloader.rule
+C:/codes/esp32/kommando/firmware/build/CMakeFiles/bootloader-complete.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+C:/codes/esp32/kommando/firmware/build/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
