@@ -1,0 +1,1083 @@
+blueprint:
+  name: ESP32 Panel - Complete Setup
+  description: Configure all 6 tiles and handle their click actions
+  domain: automation
+  input:
+    esp32_device:
+      name: ESP32 Panel Device
+      description: Select your ESP32 Panel device (links this automation to the device page)
+      selector:
+        device:
+          integration: mqtt
+
+    panel_mqtt_topic:
+      name: Panel MQTT Topic
+      description: The MQTT topic for your panel
+      default: zigbee2mqtt/ESP32Panel
+      selector:
+        text:
+
+    state_debounce_ms:
+      name: State debounce (ms)
+      description: Delay before syncing entity state back to panel to avoid rapid bounce
+      default: 300
+      selector:
+        number:
+          min: 0
+          max: 2000
+          step: 50
+          unit_of_measurement: ms
+
+    backlight_entity:
+      name: Backlight helper entity
+      description: Optional number/input_number helper to sync panel backlight (0-255)
+      default: ""
+      selector:
+        entity:
+          domain: [number, input_number]
+
+    screen_timeout_entity:
+      name: Screen timeout helper entity
+      description: Optional number/input_number helper to sync panel screen timeout (seconds)
+      default: ""
+      selector:
+        entity:
+          domain: [number, input_number]
+
+    dim_level_entity:
+      name: Dim level helper entity
+      description: Optional number/input_number helper to sync panel dim level (0-255)
+      default: ""
+      selector:
+        entity:
+          domain: [number, input_number]
+
+    night_mode_entity:
+      name: Night mode helper entity
+      description: Optional input_boolean/switch helper to sync panel night mode
+      default: ""
+      selector:
+        entity:
+          domain: [input_boolean, switch]
+
+    night_brightness_entity:
+      name: Night brightness helper entity
+      description: Optional number/input_number helper to sync panel night brightness (0-100)
+      default: ""
+      selector:
+        entity:
+          domain: [number, input_number]
+
+    deep_sleep_entity:
+      name: Deep sleep helper entity
+      description: Optional input_boolean/switch helper to sync panel deep sleep
+      default: ""
+      selector:
+        entity:
+          domain: [input_boolean, switch]
+
+    sleep_timeout_entity:
+      name: Sleep timeout helper entity
+      description: Optional number/input_number helper to sync panel sleep timeout (seconds)
+      default: ""
+      selector:
+        entity:
+          domain: [number, input_number]
+
+    # Tile 0
+    tile_0_icon:
+      name: "Tile 0 - Icon"
+      default: bulb
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_0_name:
+      name: "Tile 0 - Name"
+      default: Light 1
+      selector:
+        text:
+
+    tile_0_entity:
+      name: "Tile 0 - Entity"
+      description: Entity to toggle when tile 0 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+    # Tile 1
+    tile_1_icon:
+      name: "Tile 1 - Icon"
+      default: bulb
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_1_name:
+      name: "Tile 1 - Name"
+      default: Light 2
+      selector:
+        text:
+
+    tile_1_entity:
+      name: "Tile 1 - Entity"
+      description: Entity to toggle when tile 1 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+    # Tile 2
+    tile_2_icon:
+      name: "Tile 2 - Icon"
+      default: power
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_2_name:
+      name: "Tile 2 - Name"
+      default: Switch 1
+      selector:
+        text:
+
+    tile_2_entity:
+      name: "Tile 2 - Entity"
+      description: Entity to toggle when tile 2 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+    # Tile 3
+    tile_3_icon:
+      name: "Tile 3 - Icon"
+      default: bulb
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_3_name:
+      name: "Tile 3 - Name"
+      default: Light 3
+      selector:
+        text:
+
+    tile_3_entity:
+      name: "Tile 3 - Entity"
+      description: Entity to toggle when tile 3 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+    # Tile 4
+    tile_4_icon:
+      name: "Tile 4 - Icon"
+      default: bulb
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_4_name:
+      name: "Tile 4 - Name"
+      default: Light 4
+      selector:
+        text:
+
+    tile_4_entity:
+      name: "Tile 4 - Entity"
+      description: Entity to toggle when tile 4 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+    # Tile 5
+    tile_5_icon:
+      name: "Tile 5 - Icon"
+      default: bulb
+      selector:
+        select:
+          options:
+            - label: Bulb
+              value: bulb
+            - label: Wi-Fi
+              value: wifi
+            - label: Home
+              value: home
+            - label: Power
+              value: power
+            - label: Bell
+              value: bell
+            - label: Up
+              value: up
+            - label: Down
+              value: down
+            - label: OK
+              value: ok
+            - label: Close
+              value: close
+            - label: Audio
+              value: audio
+          custom_value: false
+
+    tile_5_name:
+      name: "Tile 5 - Name"
+      default: Light 5
+      selector:
+        text:
+
+    tile_5_entity:
+      name: "Tile 5 - Entity"
+      description: Entity to toggle when tile 5 is clicked (leave empty to skip)
+      default: ""
+      selector:
+        entity:
+          domain: [light, switch, fan, cover]
+
+variables:
+  esp32_device: !input esp32_device
+  panel_topic: !input panel_mqtt_topic
+  state_debounce_ms: !input state_debounce_ms
+  tile_0_icon: !input tile_0_icon
+  tile_0_name: !input tile_0_name
+  tile_0_entity: !input tile_0_entity
+  tile_1_icon: !input tile_1_icon
+  tile_1_name: !input tile_1_name
+  tile_1_entity: !input tile_1_entity
+  tile_2_icon: !input tile_2_icon
+  tile_2_name: !input tile_2_name
+  tile_2_entity: !input tile_2_entity
+  tile_3_icon: !input tile_3_icon
+  tile_3_name: !input tile_3_name
+  tile_3_entity: !input tile_3_entity
+  tile_4_icon: !input tile_4_icon
+  tile_4_name: !input tile_4_name
+  tile_4_entity: !input tile_4_entity
+  tile_5_icon: !input tile_5_icon
+  tile_5_name: !input tile_5_name
+  tile_5_entity: !input tile_5_entity
+  backlight_entity: !input backlight_entity
+  screen_timeout_entity: !input screen_timeout_entity
+  dim_level_entity: !input dim_level_entity
+  night_mode_entity: !input night_mode_entity
+  night_brightness_entity: !input night_brightness_entity
+  deep_sleep_entity: !input deep_sleep_entity
+  sleep_timeout_entity: !input sleep_timeout_entity
+
+trigger:
+  - platform: homeassistant
+    event: start
+    id: startup
+
+  - platform: event
+    event_type: automation_reloaded
+    id: startup
+
+  - platform: mqtt
+    topic: !input panel_mqtt_topic
+    id: click
+
+  - platform: mqtt
+    topic: zigbee2mqtt/bridge/event
+    id: device_announce
+
+  - platform: state
+    entity_id: !input tile_0_entity
+    id: state_0
+
+  - platform: state
+    entity_id: !input tile_0_entity
+    attribute: brightness
+    id: brightness_0
+
+  - platform: state
+    entity_id: !input tile_1_entity
+    id: state_1
+
+  - platform: state
+    entity_id: !input tile_1_entity
+    attribute: brightness
+    id: brightness_1
+
+  - platform: state
+    entity_id: !input tile_2_entity
+    id: state_2
+
+  - platform: state
+    entity_id: !input tile_2_entity
+    attribute: brightness
+    id: brightness_2
+
+  - platform: state
+    entity_id: !input tile_3_entity
+    id: state_3
+
+  - platform: state
+    entity_id: !input tile_3_entity
+    attribute: brightness
+    id: brightness_3
+
+  - platform: state
+    entity_id: !input tile_4_entity
+    id: state_4
+
+  - platform: state
+    entity_id: !input tile_4_entity
+    attribute: brightness
+    id: brightness_4
+
+  - platform: state
+    entity_id: !input tile_5_entity
+    id: state_5
+
+  - platform: state
+    entity_id: !input tile_5_entity
+    attribute: brightness
+    id: brightness_5
+
+  - platform: state
+    entity_id: !input backlight_entity
+    id: helper_backlight
+
+  - platform: state
+    entity_id: !input screen_timeout_entity
+    id: helper_screen_timeout
+
+  - platform: state
+    entity_id: !input dim_level_entity
+    id: helper_dim_level
+
+  - platform: state
+    entity_id: !input night_mode_entity
+    id: helper_night_mode
+
+  - platform: state
+    entity_id: !input night_brightness_entity
+    id: helper_night_brightness
+
+  - platform: state
+    entity_id: !input deep_sleep_entity
+    id: helper_deep_sleep
+
+  - platform: state
+    entity_id: !input sleep_timeout_entity
+    id: helper_sleep_timeout
+
+  # Disabled — only here so HA links this automation to the device page
+  - platform: device
+    device_id: !input esp32_device
+    domain: mqtt
+    type: action
+    subtype: "on"
+    enabled: false
+    id: device_link
+
+condition: []
+
+action:
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id | default('') != 'helper_state_changed' }}"
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/debug"
+              payload: '{"event":"automation_run","trigger":"{{ trigger.id | default("unknown") }}"}'
+
+  - choose:
+      # Branch 1: valid tile click → route to entity
+      - conditions:
+          - condition: trigger
+            id: click
+          - condition: template
+            value_template: >
+              {% set tile_idx = trigger.payload_json.tile_index | int(-1) %}
+              {% set action_ep = trigger.payload_json.action_endpoint | int(-1) %}
+              {{ tile_idx >= 0 and action_ep >= 1 and action_ep == tile_idx + 1 }}
+        sequence:
+          - variables:
+              tile_action_raw: "{{ trigger.payload_json.tile_action | default('') | string }}"
+              action_val: >-
+                {%- set a = trigger.payload_json.action | default('') | string | lower | trim -%}
+                {%- if a in ['on','off'] -%}
+                {{- a -}}
+                {%- elif tile_action_raw.startswith('T:') -%}
+                {%- set parts = tile_action_raw.split(':') -%}
+                {{- 'on' if parts | length >= 3 and parts[2] | int(0) == 1 else 'off' -}}
+                {%- else -%}
+                {{- '' -}}
+                {%- endif -%}
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/debug"
+              payload: >
+                {"event":"tile_click","tile_index":{{ trigger.payload_json.tile_index | int(-1) }},"action":"{{ action_val }}","action_raw":"{{ trigger.payload_json.action | default('') }}","tile_action":"{{ tile_action_raw }}"}
+          - variables:
+              tile_idx: "{{ trigger.payload_json.tile_index | int(-1) }}"
+              target_entity: >-
+                {%- if tile_idx == 0 -%}{{ tile_0_entity }}
+                {%- elif tile_idx == 1 -%}{{ tile_1_entity }}
+                {%- elif tile_idx == 2 -%}{{ tile_2_entity }}
+                {%- elif tile_idx == 3 -%}{{ tile_3_entity }}
+                {%- elif tile_idx == 4 -%}{{ tile_4_entity }}
+                {%- elif tile_idx == 5 -%}{{ tile_5_entity }}
+                {%- else -%}
+                {%- endif -%}
+              target_domain: "{{ (target_entity.split('.')[0] if target_entity not in ['', none] else '') | lower }}"
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_entity not in ['', none] and action_val == 'on' and target_domain == 'cover' }}"
+                sequence:
+                  - service: cover.open_cover
+                    target:
+                      entity_id: "{{ target_entity }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_entity not in ['', none] and action_val == 'off' and target_domain == 'cover' }}"
+                sequence:
+                  - service: cover.close_cover
+                    target:
+                      entity_id: "{{ target_entity }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_entity not in ['', none] and action_val == 'on' and target_domain != 'cover' }}"
+                sequence:
+                  - service: homeassistant.turn_on
+                    target:
+                      entity_id: "{{ target_entity }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ target_entity not in ['', none] and action_val == 'off' and target_domain != 'cover' }}"
+                sequence:
+                  - service: homeassistant.turn_off
+                    target:
+                      entity_id: "{{ target_entity }}"
+
+      # Branch 2: panel DIM action → set HA light brightness
+      # NOTE: DIM events from the Z2M tile_dim converter do NOT include action_endpoint,
+      # so we cannot use action_ep as a guard here. Dim is identified by act.startswith('dim:')
+      # or tile_action starting with 'D:', both of which require tile_index >= 0.
+      - conditions:
+          - condition: trigger
+            id: click
+          - condition: template
+            value_template: >
+              {% set act = trigger.payload_json.action | default('') | string %}
+              {% set tile_act = trigger.payload_json.tile_action | default('') | string %}
+              {% set tile_idx = trigger.payload_json.tile_index | int(-1) %}
+              {% if tile_idx < 0 %}
+                {{ false }}
+              {% elif act.startswith('dim:') %}
+                {{ true }}
+              {% elif tile_act.startswith('D:') %}
+                {% set tile_act_parts = tile_act.split(':') %}
+                {{ tile_act_parts | length >= 3 and tile_act_parts[1] | int(-1) == tile_idx }}
+              {% else %}
+                {{ false }}
+              {% endif %}
+        sequence:
+          - variables:
+              dim_level: >
+                {% if trigger.payload_json.tile_level is defined %}
+                  {{ trigger.payload_json.tile_level | int(0) }}
+                {% else %}
+                  {{ (trigger.payload_json.tile_action.split(':')[2] | int(0)) if (trigger.payload_json.tile_action | default('') | string).startswith('D:') else 0 }}
+                {% endif %}
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 0 and tile_0_entity not in ['', none] and tile_0_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_0_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 1 and tile_1_entity not in ['', none] and tile_1_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_1_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 2 and tile_2_entity not in ['', none] and tile_2_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_2_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 3 and tile_3_entity not in ['', none] and tile_3_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_3_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 4 and tile_4_entity not in ['', none] and tile_4_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_4_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+              - conditions:
+                  - condition: template
+                    value_template: "{{ trigger.payload_json.tile_index | int(-1) == 5 and tile_5_entity not in ['', none] and tile_5_entity.split('.')[0] == 'light' }}"
+                sequence:
+                  - service: light.turn_on
+                    target:
+                      entity_id: "{{ tile_5_entity }}"
+                    data:
+                      brightness_pct: "{{ dim_level }}"
+
+      # Branch 3: entity state changed → update tile visual state + brightness level
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id in ['state_0','state_1','state_2','state_3','state_4','state_5'] }}"
+          - condition: template
+            value_template: "{{ trigger.from_state is defined and trigger.to_state is defined and trigger.from_state.state != trigger.to_state.state }}"
+        sequence:
+          - variables:
+              tile_num: "{{ trigger.id.split('_')[1] }}"
+              entity_id: "{{ trigger.entity_id }}"
+              debounce_ms: "{{ state_debounce_ms | int(0) }}"
+              new_state: "{{ 1 if trigger.to_state.state in ['on','true','True','1'] else 0 }}"
+              entity_domain: "{{ entity_id.split('.')[0] if entity_id not in ['', none] else '' }}"
+              brightness_attr: "{{ state_attr(entity_id, 'brightness') }}"
+              brightness_pct: "{{ (((brightness_attr | int(0)) * 100 / 255) | round(0)) | int if brightness_attr is not none and entity_domain == 'light' else 0 }}"
+          - delay:
+              milliseconds: "{{ debounce_ms }}"
+          - condition: template
+            value_template: >
+              {{ debounce_ms == 0
+                 or (states(entity_id) == trigger.to_state.state
+                     and (as_timestamp(now()) - as_timestamp(states[entity_id].last_changed)) >= (debounce_ms / 1000)) }}
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:{{ tile_num }}:{{ new_state }}"}'
+          - condition: template
+            value_template: "{{ entity_domain == 'light' }}"
+          - delay:
+              milliseconds: 50
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"L:{{ tile_num }}:{{ 0 if new_state == 0 else brightness_pct }}"}'
+
+      # Branch 3a: entity brightness attribute changed → update tile level
+      - conditions:
+          - condition: template
+            value_template: "{{ trigger.id in ['brightness_0','brightness_1','brightness_2','brightness_3','brightness_4','brightness_5'] }}"
+          - condition: template
+            value_template: "{{ trigger.from_state is defined and trigger.to_state is defined }}"
+        sequence:
+          - variables:
+              tile_num: "{{ trigger.id.split('_')[1] }}"
+              entity_id: "{{ trigger.entity_id }}"
+              entity_domain: "{{ entity_id.split('.')[0] if entity_id not in ['', none] else '' }}"
+              brightness_attr: "{{ trigger.to_state.attributes.brightness }}"
+              brightness_pct: "{{ (((brightness_attr | int(0)) * 100 / 255) | round(0)) | int if brightness_attr is not none else 0 }}"
+          - condition: template
+            value_template: "{{ entity_domain == 'light' and brightness_attr is not none }}"
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"L:{{ tile_num }}:{{ brightness_pct }}"}'
+
+      # Branch 3b: panel state payload -> sync panel settings into HA helpers
+      - conditions:
+          - condition: trigger
+            id: click
+          - condition: template
+            value_template: >
+              {% set action_str = trigger.payload_json.action | default('') | string | lower | trim %}
+              {{ trigger.payload_json.backlight is defined
+                 or action_str.startswith('backlight:')
+                 or trigger.payload_json.screen_timeout is defined
+                 or trigger.payload_json.dim_level is defined
+                 or trigger.payload_json.night_mode is defined
+                 or trigger.payload_json.night_brightness is defined
+                 or trigger.payload_json.deep_sleep is defined
+                 or trigger.payload_json.sleep_timeout is defined }}
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set action_str = trigger.payload_json.action | default('') | string | lower | trim %}
+                      {% set incoming = (trigger.payload_json.backlight | int(0)) if trigger.payload_json.backlight is defined else ((action_str.split(':')[1] | int(0)) if action_str.startswith('backlight:') else none) %}
+                      {% set current = states(backlight_entity) | int(-9999) if backlight_entity not in ['', none] else -9999 %}
+                      {{ backlight_entity not in ['', none]
+                         and (trigger.payload_json.backlight is defined or action_str.startswith('backlight:'))
+                         and incoming is not none
+                         and incoming != current }}
+                sequence:
+                  - service: "{{ 'number.set_value' if backlight_entity.split('.')[0] == 'number' else 'input_number.set_value' }}"
+                    target:
+                      entity_id: "{{ backlight_entity }}"
+                    data:
+                      value: >
+                        {% set action_str = trigger.payload_json.action | default('') | string | lower | trim %}
+                        {% if trigger.payload_json.backlight is defined %}
+                          {{ trigger.payload_json.backlight | int(0) }}
+                        {% elif action_str.startswith('backlight:') %}
+                          {{ action_str.split(':')[1] | int(0) }}
+                        {% else %}
+                          0
+                        {% endif %}
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = trigger.payload_json.screen_timeout | int(-9999) %}
+                      {% set current = states(screen_timeout_entity) | int(-9999) %}
+                      {{ screen_timeout_entity not in ['', none]
+                         and trigger.payload_json.screen_timeout is defined
+                         and incoming != current }}
+                sequence:
+                  - service: "{{ 'number.set_value' if screen_timeout_entity.split('.')[0] == 'number' else 'input_number.set_value' }}"
+                    target:
+                      entity_id: "{{ screen_timeout_entity }}"
+                    data:
+                      value: "{{ trigger.payload_json.screen_timeout | int(0) }}"
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = trigger.payload_json.dim_level | int(-9999) %}
+                      {% set current = states(dim_level_entity) | int(-9999) %}
+                      {{ dim_level_entity not in ['', none]
+                         and trigger.payload_json.dim_level is defined
+                         and incoming != current }}
+                sequence:
+                  - service: "{{ 'number.set_value' if dim_level_entity.split('.')[0] == 'number' else 'input_number.set_value' }}"
+                    target:
+                      entity_id: "{{ dim_level_entity }}"
+                    data:
+                      value: "{{ trigger.payload_json.dim_level | int(0) }}"
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = 1 if trigger.payload_json.night_mode | bool(false) else 0 %}
+                      {% set current = 1 if states(night_mode_entity) in ['on','true','True','1'] else 0 %}
+                      {{ night_mode_entity not in ['', none]
+                         and trigger.payload_json.night_mode is defined
+                         and incoming != current }}
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ trigger.payload_json.night_mode | bool(false) }}"
+                        sequence:
+                          - service: "{{ 'input_boolean.turn_on' if night_mode_entity.split('.')[0] == 'input_boolean' else 'switch.turn_on' }}"
+                            target:
+                              entity_id: "{{ night_mode_entity }}"
+                    default:
+                      - service: "{{ 'input_boolean.turn_off' if night_mode_entity.split('.')[0] == 'input_boolean' else 'switch.turn_off' }}"
+                        target:
+                          entity_id: "{{ night_mode_entity }}"
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = trigger.payload_json.night_brightness | int(-9999) %}
+                      {% set current = states(night_brightness_entity) | int(-9999) %}
+                      {{ night_brightness_entity not in ['', none]
+                         and trigger.payload_json.night_brightness is defined
+                         and incoming != current }}
+                sequence:
+                  - service: "{{ 'number.set_value' if night_brightness_entity.split('.')[0] == 'number' else 'input_number.set_value' }}"
+                    target:
+                      entity_id: "{{ night_brightness_entity }}"
+                    data:
+                      value: "{{ trigger.payload_json.night_brightness | int(0) }}"
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = 1 if trigger.payload_json.deep_sleep | bool(false) else 0 %}
+                      {% set current = 1 if states(deep_sleep_entity) in ['on','true','True','1'] else 0 %}
+                      {{ deep_sleep_entity not in ['', none]
+                         and trigger.payload_json.deep_sleep is defined
+                         and incoming != current }}
+                sequence:
+                  - choose:
+                      - conditions:
+                          - condition: template
+                            value_template: "{{ trigger.payload_json.deep_sleep | bool(false) }}"
+                        sequence:
+                          - service: "{{ 'input_boolean.turn_on' if deep_sleep_entity.split('.')[0] == 'input_boolean' else 'switch.turn_on' }}"
+                            target:
+                              entity_id: "{{ deep_sleep_entity }}"
+                    default:
+                      - service: "{{ 'input_boolean.turn_off' if deep_sleep_entity.split('.')[0] == 'input_boolean' else 'switch.turn_off' }}"
+                        target:
+                          entity_id: "{{ deep_sleep_entity }}"
+              - conditions:
+                  - condition: template
+                    value_template: >
+                      {% set incoming = trigger.payload_json.sleep_timeout | int(-9999) %}
+                      {% set current = states(sleep_timeout_entity) | int(-9999) %}
+                      {{ sleep_timeout_entity not in ['', none]
+                         and trigger.payload_json.sleep_timeout is defined
+                         and incoming != current }}
+                sequence:
+                  - service: "{{ 'number.set_value' if sleep_timeout_entity.split('.')[0] == 'number' else 'input_number.set_value' }}"
+                    target:
+                      entity_id: "{{ sleep_timeout_entity }}"
+                    data:
+                      value: "{{ trigger.payload_json.sleep_timeout | int(0) }}"
+
+      # Branch 3c: HA helper state changed -> push panel setting via Z2M (with change guard)
+      - conditions:
+          - condition: trigger
+            id:
+              - helper_backlight
+              - helper_screen_timeout
+              - helper_dim_level
+              - helper_night_mode
+              - helper_night_brightness
+              - helper_deep_sleep
+              - helper_sleep_timeout
+          - condition: template
+            value_template: "{{ trigger.from_state is defined and trigger.to_state is defined and trigger.from_state.state != trigger.to_state.state }}"
+        sequence:
+          - choose:
+              - conditions:
+                  - condition: trigger
+                    id: helper_backlight
+                  - condition: template
+                    value_template: "{{ backlight_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"backlight":{{ trigger.to_state.state | int(0) }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_screen_timeout
+                  - condition: template
+                    value_template: "{{ screen_timeout_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"screen_timeout":{{ trigger.to_state.state | int(0) }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_dim_level
+                  - condition: template
+                    value_template: "{{ dim_level_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"dim_level":{{ trigger.to_state.state | int(0) }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_night_mode
+                  - condition: template
+                    value_template: "{{ night_mode_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"night_mode":{{ 1 if trigger.to_state.state in ["on","true","True","1"] else 0 }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_night_brightness
+                  - condition: template
+                    value_template: "{{ night_brightness_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"night_brightness":{{ trigger.to_state.state | int(0) }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_deep_sleep
+                  - condition: template
+                    value_template: "{{ deep_sleep_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"deep_sleep":{{ 1 if trigger.to_state.state in ["on","true","True","1"] else 0 }}}'
+              - conditions:
+                  - condition: trigger
+                    id: helper_sleep_timeout
+                  - condition: template
+                    value_template: "{{ sleep_timeout_entity not in ['', none] }}"
+                sequence:
+                  - service: mqtt.publish
+                    data:
+                      topic: "{{ panel_topic }}/set"
+                      payload: '{"sleep_timeout":{{ trigger.to_state.state | int(0) }}}'
+
+      # Branch 4: startup, manual run, or panel READY → configure all tiles + sync states
+      - conditions:
+          - condition: template
+            value_template: >
+              {% set trigger_id = trigger.id | default('') %}
+              {% set panel_name = (panel_topic.split('/')[1] if (panel_topic | string).startswith('zigbee2mqtt/') else '') %}
+              {% set is_device_announce = (
+                   trigger_id == 'device_announce'
+                   and trigger.payload_json is defined
+                   and trigger.payload_json.type | default('') == 'device_announce'
+                   and trigger.payload_json.data is defined
+                   and trigger.payload_json.data.friendly_name | default('') == panel_name
+                 ) %}
+              {{
+                trigger_id in ['startup']
+                or is_device_announce
+              }}
+        sequence:
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/debug"
+              payload: '{"event":"startup_sync","trigger":"{{ trigger.id | default("unknown") }}"}'
+          # Wait for all configured entities to leave unknown/unavailable (up to 15 s)
+          - wait_template: >
+              {% set entities = [tile_0_entity, tile_1_entity, tile_2_entity,
+                                 tile_3_entity, tile_4_entity, tile_5_entity] %}
+              {% set ns = namespace(all_ready=true) %}
+              {% for e in entities %}
+                {% if e not in ['', none] and states(e) in ['unknown', 'unavailable'] %}
+                  {% set ns.all_ready = false %}
+                {% endif %}
+              {% endfor %}
+              {{ ns.all_ready }}
+            timeout: "00:00:15"
+            continue_on_timeout: true
+          # Publish actual entity states for debugging
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/debug"
+              payload: '{"event":"state_snapshot","t0":"{{ states(tile_0_entity) if tile_0_entity not in ["", none] else "N/A" }}","t1":"{{ states(tile_1_entity) if tile_1_entity not in ["", none] else "N/A" }}","t2":"{{ states(tile_2_entity) if tile_2_entity not in ["", none] else "N/A" }}","t3":"{{ states(tile_3_entity) if tile_3_entity not in ["", none] else "N/A" }}","t4":"{{ states(tile_4_entity) if tile_4_entity not in ["", none] else "N/A" }}","t5":"{{ states(tile_5_entity) if tile_5_entity not in ["", none] else "N/A" }}"}'
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:0:{{ tile_0_icon }}:{{ tile_0_name }}"}'
+          - delay:
+              milliseconds: 100
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:1:{{ tile_1_icon }}:{{ tile_1_name }}"}'
+          - delay:
+              milliseconds: 100
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:2:{{ tile_2_icon }}:{{ tile_2_name }}"}'
+          - delay:
+              milliseconds: 100
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:3:{{ tile_3_icon }}:{{ tile_3_name }}"}'
+          - delay:
+              milliseconds: 100
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:4:{{ tile_4_icon }}:{{ tile_4_name }}"}'
+          - delay:
+              milliseconds: 100
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"C:5:{{ tile_5_icon }}:{{ tile_5_name }}"}'
+          - delay:
+              milliseconds: 200
+          # Sync dim capabilities + current dim levels (D:<id>:<enabled>:<0..100>)
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:0:{{ 1 if tile_0_entity and tile_0_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_0_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 120
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:1:{{ 1 if tile_1_entity and tile_1_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_1_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 120
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:2:{{ 1 if tile_2_entity and tile_2_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_2_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 120
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:3:{{ 1 if tile_3_entity and tile_3_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_3_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 120
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:4:{{ 1 if tile_4_entity and tile_4_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_4_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 120
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"D:5:{{ 1 if tile_5_entity and tile_5_entity.split(".")[0] == "light" else 0 }}:{{ (((state_attr(tile_5_entity, "brightness") | int(0)) * 100 / 255) | round(0)) | int }}"}'
+          - delay:
+              milliseconds: 200
+          # Sync current entity states (live from HA) to the panel
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:0:{{ 1 if tile_0_entity not in ["", none] and states(tile_0_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+          - delay:
+              milliseconds: 150
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:1:{{ 1 if tile_1_entity not in ["", none] and states(tile_1_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+          - delay:
+              milliseconds: 150
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:2:{{ 1 if tile_2_entity not in ["", none] and states(tile_2_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+          - delay:
+              milliseconds: 150
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:3:{{ 1 if tile_3_entity not in ["", none] and states(tile_3_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+          - delay:
+              milliseconds: 150
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:4:{{ 1 if tile_4_entity not in ["", none] and states(tile_4_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+          - delay:
+              milliseconds: 150
+          - service: mqtt.publish
+            data:
+              topic: "{{ panel_topic }}/set"
+              payload: '{"ui_cmd":"S:5:{{ 1 if tile_5_entity not in ["", none] and states(tile_5_entity) | lower in ["on","true","1","open","unlocked"] else 0 }}"}'
+
+mode: queued
+max_exceeded: silent

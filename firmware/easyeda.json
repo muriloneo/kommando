@@ -1,0 +1,245 @@
+{
+  "head": {
+    "docType": "1",
+    "editorVersion": "6.5.36",
+    "title": "ESP32Panel_Kommando"
+  },
+
+  "components": [
+
+    { "type": "ESP32-C6-WROOM-1", "ref": "U1", "x": 900, "y": 600 },
+
+    { "type": "USB-C", "ref": "J1", "x": 200, "y": 600 },
+
+    { "type": "LDO", "ref": "U2", "value": "AMS1117-3.3", "x": 450, "y": 600 },
+
+    { "type": "LCD", "ref": "J2", "value": "ST7789_LCD", "x": 1400, "y": 500 },
+
+    { "type": "TOUCH", "ref": "U3", "value": "CST816", "x": 1400, "y": 820 },
+
+    { "type": "R", "ref": "R1", "value": "10k", "x": 850, "y": 450 },
+
+    { "type": "R", "ref": "R2", "value": "4.7k", "x": 1300, "y": 750 },
+
+    { "type": "R", "ref": "R3", "value": "4.7k", "x": 1300, "y": 850 },
+
+    { "type": "R", "ref": "R4", "value": "5.1k", "x": 250, "y": 520 },
+
+    { "type": "R", "ref": "R5", "value": "5.1k", "x": 250, "y": 700 },
+
+    { "type": "R", "ref": "R6", "value": "22", "x": 320, "y": 550 },
+
+    { "type": "R", "ref": "R7", "value": "22", "x": 320, "y": 650 },
+
+    { "type": "R", "ref": "R8", "value": "10k", "x": 780, "y": 520 },
+
+    { "type": "R", "ref": "R9", "value": "10k", "x": 1320, "y": 900 },
+
+    { "type": "SW", "ref": "SW1", "value": "BOOT", "x": 760, "y": 470 },
+
+    { "type": "SW", "ref": "SW2", "value": "RESET", "x": 900, "y": 420 },
+
+    { "type": "C", "ref": "C1", "value": "10uF", "x": 600, "y": 540 },
+
+    { "type": "C", "ref": "C2", "value": "22uF", "x": 600, "y": 660 },
+
+    { "type": "C", "ref": "C3", "value": "100nF", "x": 870, "y": 380 }
+  ],
+
+  "nets": [
+
+    {
+      "name": "5V",
+      "nodes": [
+        ["J1","VBUS"],
+        ["U2","VIN"],
+        ["C1","1"]
+      ]
+    },
+
+    {
+      "name": "3V3",
+      "nodes": [
+        ["U2","VOUT"],
+        ["U1","3V3"],
+        ["U3","VDD"],
+        ["J2","VCC"],
+        ["R1","2"],
+        ["R2","1"],
+        ["R3","1"],
+        ["R8","1"],
+        ["R9","1"],
+        ["C2","1"]
+      ]
+    },
+
+    {
+      "name": "GND",
+      "nodes": [
+        ["J1","GND"],
+        ["U1","GND"],
+        ["U2","GND"],
+        ["U3","GND"],
+        ["J2","GND"],
+        ["R4","2"],
+        ["R5","2"],
+        ["SW1","2"],
+        ["SW2","2"],
+        ["C1","2"],
+        ["C2","2"],
+        ["C3","2"]
+      ]
+    },
+
+    {
+      "name": "USB_CC1",
+      "nodes": [
+        ["J1","CC1"],
+        ["R4","1"]
+      ]
+    },
+
+    {
+      "name": "USB_CC2",
+      "nodes": [
+        ["J1","CC2"],
+        ["R5","1"]
+      ]
+    },
+
+    {
+      "name": "USB_DM",
+      "nodes": [
+        ["J1","D-"],
+        ["R6","1"]
+      ]
+    },
+
+    {
+      "name": "USB_DP",
+      "nodes": [
+        ["J1","D+"],
+        ["R7","1"]
+      ]
+    },
+
+    {
+      "name": "ESP_DM",
+      "nodes": [
+        ["R6","2"],
+        ["U1","GPIO12"]
+      ]
+    },
+
+    {
+      "name": "ESP_DP",
+      "nodes": [
+        ["R7","2"],
+        ["U1","GPIO13"]
+      ]
+    },
+
+    {
+      "name": "SPI_CLK",
+      "nodes": [
+        ["U1","GPIO6"],
+        ["J2","LCD_CLK"]
+      ]
+    },
+
+    {
+      "name": "SPI_MOSI",
+      "nodes": [
+        ["U1","GPIO7"],
+        ["J2","LCD_DIN"]
+      ]
+    },
+
+    {
+      "name": "LCD_CS",
+      "nodes": [
+        ["U1","GPIO10"],
+        ["J2","LCD_CS"]
+      ]
+    },
+
+    {
+      "name": "LCD_DC",
+      "nodes": [
+        ["U1","GPIO11"],
+        ["J2","LCD_DC"]
+      ]
+    },
+
+    {
+      "name": "LCD_RST",
+      "nodes": [
+        ["U1","GPIO3"],
+        ["J2","LCD_RST"]
+      ]
+    },
+
+    {
+      "name": "LCD_BL",
+      "nodes": [
+        ["U1","GPIO2"],
+        ["J2","LCD_BL"]
+      ]
+    },
+
+    {
+      "name": "I2C_SDA",
+      "nodes": [
+        ["U1","GPIO0"],
+        ["U3","TP_SDA"],
+        ["R2","2"]
+      ]
+    },
+
+    {
+      "name": "I2C_SCL",
+      "nodes": [
+        ["U1","GPIO1"],
+        ["U3","TP_SCL"],
+        ["R3","2"]
+      ]
+    },
+
+    {
+      "name": "TOUCH_RST",
+      "nodes": [
+        ["U1","GPIO20"],
+        ["U3","TP_RST"]
+      ]
+    },
+
+    {
+      "name": "TOUCH_INT",
+      "nodes": [
+        ["U1","GPIO19"],
+        ["U3","TP_IRQ"],
+        ["R9","2"]
+      ]
+    },
+
+    {
+      "name": "EN_PULLUP",
+      "nodes": [
+        ["U1","EN"],
+        ["R1","1"],
+        ["SW2","1"],
+        ["C3","1"]
+      ]
+    },
+
+    {
+      "name": "BOOT",
+      "nodes": [
+        ["U1","GPIO8"],
+        ["R8","2"],
+        ["SW1","1"]
+      ]
+    }
+
+  ]
+}

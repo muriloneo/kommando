@@ -1,0 +1,93 @@
+# ESP-IDF build output
+/build/
+firmware/build/
+*.elf
+*.bin
+!firmware/releases/
+!firmware/releases/*.bin
+*.map
+*.d
+*.o
+*.a
+*.log
+*.pyc
+*.pyo
+*.swp
+*.swo
+*.swn
+*.bak
+*.tmp
+*.old
+*.orig
+*.rej
+*.suo
+*.user
+*.DS_Store
+*.vscode/
+*.idea/
+*.env
+*.pyc
+__pycache__/
+*.ipch
+*.aps
+*.ncb
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+*.idb
+*.pdb
+*.ilk
+*.obj
+*.exe
+*.dll
+*.lib
+*.exp
+*.log
+*.out
+*.dat
+*.dump
+*.trace
+*.bkp
+*.backup
+*.gdbinit
+sdkconfig.old
+# NOTE: keep firmware/sdkconfig tracked for reproducible builds
+# sdkconfig
+# sdkconfig.defaults
+# sdkconfig.json
+# sdkconfig.h
+# sdkconfig.cmake
+# ESP-IDF Python environment
+.env/
+.venv/
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+# Ninja
+build.ninja
+# Partition table
+# NOTE: keep firmware/partition_table tracked (critical project config)
+# partition_table/
+# Bootloader
+bootloader/
+bootloader-prefix/
+# Managed components
+managed_components/
+# Misc
+*.orig
+*.rej
+# VS Code
+.vscode/
+# CLion
+.idea/
+# MacOS
+.DS_Store
+# Windows
+Thumbs.db
+# Logs
+*.log
+
+firmware/archive/
+docs/MEDIA_GUIDE.md
