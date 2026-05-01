@@ -51,6 +51,7 @@ volatile bool g_lvgl_ready = false;
 /* Shared flag: true when screen is ACTIVE (not dimmed/sleeping).
  * Written by display_timeout_task(), read by tile_event_cb(). */
 volatile bool g_screen_active = true;
+volatile bool g_screen_hw_sleeping = false;
 
 /* Retained handles so the timeout task can put the LCD into HW sleep */
 static esp_lcd_panel_io_handle_t s_lcd_io   = NULL;
@@ -137,12 +138,26 @@ lv_display_t *display_init(void)
     tp_io_cfg.scl_speed_hz = TOUCH_I2C_CLK_HZ;
     ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(i2c_bus, &tp_io_cfg, &tp_io));
 
+    /* ---- Manual CST816 reset: LOW → 10 ms → HIGH → 50 ms ---- */
+    gpio_config_t rst_cfg = {
+        .pin_bit_mask = (1ULL << PIN_TOUCH_RST),
+        .mode         = GPIO_MODE_OUTPUT,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
+    };
+    gpio_config(&rst_cfg);
+    gpio_set_level(PIN_TOUCH_RST, 0);
+    vTaskDelay(pdMS_TO_TICKS(10));
+    gpio_set_level(PIN_TOUCH_RST, 1);
+    vTaskDelay(pdMS_TO_TICKS(50));
+
     esp_lcd_touch_handle_t tp = NULL;
     esp_lcd_touch_config_t tp_cfg = {
         .x_max = LCD_H_RES,
         .y_max = LCD_V_RES,
-        .rst_gpio_num = PIN_TOUCH_RST,
-        .int_gpio_num = PIN_TOUCH_INT,     /* GPIO_NUM_NC if not wired        */
+        .rst_gpio_num = GPIO_NUM_NC,       /* Already reset manually above    */
+        .int_gpio_num = PIN_TOUCH_INT,     /* GPIO4 — deep-sleep wake capable */
         .levels          = {.reset = 0, .interrupt = 0},
         .flags           = {.swap_xy = 0, .mirror_x = 0, .mirror_y = 0},
         .interrupt_callback = NULL,
@@ -213,11 +228,32 @@ static void lcd_exit_sleep(void)
     ESP_LOGI(TAG, "LCD HW wake (SLPOUT)");
 }
 
+static bool configure_touch_wakeup_source(void)
+{
+    /* CST816 INT is active-low: wake when pin goes low */
+    if (!esp_sleep_is_valid_wakeup_gpio(PIN_TOUCH_INT)) {
+        ESP_LOGE(TAG, "GPIO%d is not valid for deep-sleep wakeup", (int)PIN_TOUCH_INT);
+        return false;
+    }
+
+    uint64_t io_mask = (1ULL << PIN_TOUCH_INT);
+    esp_err_t err = esp_sleep_enable_ext1_wakeup(io_mask, ESP_EXT1_WAKEUP_ANY_LOW);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to enable ext1 wake on GPIO%d: %s",
+                 (int)PIN_TOUCH_INT, esp_err_to_name(err));
+        return false;
+    }
+
+    ESP_LOGI(TAG, "Deep sleep wake source set: touch INT GPIO%d (ANY_LOW)", (int)PIN_TOUCH_INT);
+    return true;
+}
+
 void display_timeout_task(void *arg)
 {
     screen_state_t state        = SCREEN_ACTIVE;
     TickType_t     last_seen    = xTaskGetTickCount();
     g_screen_active = true;
+    g_screen_hw_sleeping = false;
 
     /* Wait until backlight is fully ready (display_init() may still be settling) */
     vTaskDelay(pdMS_TO_TICKS(500));
@@ -242,6 +278,7 @@ void display_timeout_task(void *arg)
                 backlight_set(g_dim_level);
                 state = SCREEN_DIMMED;
                 g_screen_active = false;
+                g_screen_hw_sleeping = false;
                 ESP_LOGI(TAG, "Screen dimmed (idle %us)", idle_s);
             }
             break;
@@ -252,6 +289,7 @@ void display_timeout_task(void *arg)
                 backlight_set(target_level);
                 state = SCREEN_ACTIVE;
                 g_screen_active = true;
+                g_screen_hw_sleeping = false;
                 ESP_LOGI(TAG, "Screen woken");
                 break;
             }
@@ -259,9 +297,18 @@ void display_timeout_task(void *arg)
                 backlight_set(0);
                 lcd_enter_sleep();             /* DISPOFF + SLPIN → ~10 µA LCD power */
                 state = SCREEN_SLEEP;
+                g_screen_hw_sleeping = true;
                 ESP_LOGI(TAG, "Screen off (sleep, idle %us)", idle_s);
-                /* Note: Light sleep disabled — was blocking flash/Zigbee/toggle.
-                 * LCD hardware sleep (SLPIN) saves most power anyway (~10 µA). */
+
+                if (g_deep_sleep_enabled) {
+                    if (configure_touch_wakeup_source()) {
+                        ESP_LOGI(TAG, "Entering deep sleep (idle %us)", idle_s);
+                        vTaskDelay(pdMS_TO_TICKS(20));
+                        esp_deep_sleep_start();
+                    } else {
+                        ESP_LOGW(TAG, "Deep sleep skipped: wake source config failed");
+                    }
+                }
             }
             break;
 
@@ -272,6 +319,7 @@ void display_timeout_task(void *arg)
                 backlight_set(target_level);
                 state = SCREEN_ACTIVE;
                 g_screen_active = true;
+                g_screen_hw_sleeping = false;
                 ESP_LOGI(TAG, "Screen woken from sleep");
             }
             break;

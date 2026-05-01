@@ -88,4 +88,4 @@ direct_dependencies:
 - lvgl/lvgl
 manifest_hash: 8604a57821d1116968062b182ca5a9885ed635fbea5c1f2182311a86b138cfde
 target: esp32c6
-version: 2.0.0
+version: 3.0.0

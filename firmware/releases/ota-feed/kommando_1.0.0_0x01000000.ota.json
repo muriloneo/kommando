@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "projectVersion": "1.0.0",
+  "fileVersion": 16777216,
+  "manufacturerCode": 4660,
+  "imageType": 4113,
+  "hardwareVersion": 257,
+  "source": "C:\\codes\\esp32\\kommando\\firmware\\releases\\kommando_1.0.0.ota",
+  "published": "C:\\codes\\esp32\\kommando\\firmware\\releases\\ota-feed\\kommando_1.0.0_0x01000000.ota",
+  "sha512": "d9445f3011988b1b24669ee74eaf4b9422e52e13c1a2f90a782323d46cd561099fb7423cc6bd51f96be811ee0b1c59b8bd5dc844e3a8179d18673a5660cfe6b4",
+  "createdAt": "2026-03-29T17:23:44Z"
+}

@@ -33,6 +33,9 @@ static lv_obj_t *s_dimmer_overlay = NULL;
 static lv_obj_t *s_dimmer_title   = NULL;
 static lv_obj_t *s_dimmer_value   = NULL;
 static lv_obj_t *s_dimmer_slider  = NULL;
+static lv_obj_t *s_conn_overlay   = NULL;
+static lv_obj_t *s_conn_label     = NULL;
+static lv_obj_t *s_conn_spinner   = NULL;
 static int       s_dimmer_tile_id = -1;
 static bool      s_dimmer_is_panel = false;
 static lv_timer_t *s_dimmer_idle_timer = NULL;
@@ -216,6 +219,21 @@ void ui_panel_hide_dimmer(void)
     s_dimmer_is_panel = false;
 }
 
+void ui_panel_set_connection_overlay(bool connected, const char *status_text)
+{
+    if (!s_conn_overlay) return;
+
+    if (connected) {
+        lv_obj_add_flag(s_conn_overlay, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    if (status_text && s_conn_label) {
+        lv_label_set_text(s_conn_label, status_text);
+    }
+    lv_obj_clear_flag(s_conn_overlay, LV_OBJ_FLAG_HIDDEN);
+}
+
 void ui_panel_update_dimmer_badge(int tile_id, bool dimmable)
 {
     if (tile_id < 0 || tile_id >= MAX_TILES) return;
@@ -348,6 +366,26 @@ void ui_panel_build(lv_display_t *disp)
 
         ESP_LOGD(TAG, "Tile[%d] created (row=%d col=%d)", i, row, col);
     }
+
+    /* ---- Connection/loading overlay (visible until Zigbee is joined) ---- */
+    s_conn_overlay = lv_obj_create(scr);
+    lv_obj_set_size(s_conn_overlay, LCD_H_RES, LCD_V_RES);
+    lv_obj_align(s_conn_overlay, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_bg_color(s_conn_overlay, lv_color_black(), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_conn_overlay, LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_border_width(s_conn_overlay, 0, LV_PART_MAIN);
+    lv_obj_set_style_radius(s_conn_overlay, 0, LV_PART_MAIN);
+    lv_obj_clear_flag(s_conn_overlay, LV_OBJ_FLAG_SCROLLABLE);
+
+    s_conn_spinner = lv_spinner_create(s_conn_overlay);
+    lv_obj_set_size(s_conn_spinner, 44, 44);
+    lv_obj_align(s_conn_spinner, LV_ALIGN_CENTER, 0, -20);
+
+    s_conn_label = lv_label_create(s_conn_overlay);
+    lv_label_set_text(s_conn_label, "Connecting to Zigbee...");
+    lv_obj_set_style_text_color(s_conn_label, lv_color_white(), LV_PART_MAIN);
+    lv_obj_set_style_text_font(s_conn_label, &lv_font_montserrat_14, LV_PART_MAIN);
+    lv_obj_align(s_conn_label, LV_ALIGN_CENTER, 0, 22);
 
     /* ---- Dimmer overlay (hidden by default, opened by tile long-press) ---- */
     s_dimmer_overlay = lv_obj_create(scr);

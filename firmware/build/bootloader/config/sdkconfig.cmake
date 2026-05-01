@@ -1,7 +1,7 @@
 #
-                # Automatically generated file. DO NOT EDIT.
-                # Espressif IoT Development Framework (ESP-IDF) Configuration cmake include file
-                #
+# Automatically generated file. DO NOT EDIT.
+# Espressif IoT Development Framework (ESP-IDF) Configuration cmake include file
+#
 set(CONFIG_SOC_ADC_SUPPORTED "y")
 set(CONFIG_SOC_DEDICATED_GPIO_SUPPORTED "y")
 set(CONFIG_SOC_UART_SUPPORTED "y")

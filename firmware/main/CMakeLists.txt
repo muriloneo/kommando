@@ -11,6 +11,7 @@ idf_component_register(
         "button.c"
     INCLUDE_DIRS "."
     REQUIRES
+        app_update
         esp_timer
         driver
         led_strip

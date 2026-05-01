@@ -1115,7 +1115,7 @@
             "dir": "C:/codes/esp32/kommando/firmware/main",
             "type": "LIBRARY",
             "lib": "__idf_main",
-            "reqs": [ "esp_timer", "driver", "espressif__led_strip", "nvs_flash", "esp_lcd", "esp_driver_spi", "esp_driver_i2c", "esp_driver_gpio", "esp_driver_ledc" ],
+            "reqs": [ "app_update", "esp_timer", "driver", "espressif__led_strip", "nvs_flash", "esp_lcd", "esp_driver_spi", "esp_driver_i2c", "esp_driver_gpio", "esp_driver_ledc" ],
             "priv_reqs": [ "nvs_flash", "esp_driver_uart", "ieee802154", "espressif__esp-zboss-lib", "espressif__esp-zigbee-lib", "espressif__esp_lcd_touch_cst816s", "espressif__esp_lvgl_port", "espressif__led_strip", "lvgl__lvgl" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__esp-zboss-lib", "espressif__esp-zigbee-lib", "espressif__esp_lcd_touch_cst816s", "espressif__esp_lvgl_port", "espressif__led_strip", "lvgl__lvgl" ],
@@ -1431,7 +1431,7 @@
             "priv_reqs": [ "http_parser", "esp_timer", "lwip" ],
             "managed_reqs": [],
             "managed_priv_reqs": [],
-            "include_dirs": [ "C:/codes/esp32/kommando/firmware/build", "esp-tls-crypto" ]
+            "include_dirs": [ "C:/codes/esp32/kommando/firmware", "esp-tls-crypto" ]
         },
         "esp_adc": {
             "alias": "idf::esp_adc",
@@ -2987,7 +2987,7 @@
             "dir": "C:/codes/esp32/kommando/firmware/main",
             "source": "project_components",
             "lib": "__idf_main",
-            "reqs": [ "esp_timer", "driver", "espressif__led_strip", "nvs_flash", "esp_lcd", "esp_driver_spi", "esp_driver_i2c", "esp_driver_gpio", "esp_driver_ledc" ],
+            "reqs": [ "app_update", "esp_timer", "driver", "espressif__led_strip", "nvs_flash", "esp_lcd", "esp_driver_spi", "esp_driver_i2c", "esp_driver_gpio", "esp_driver_ledc" ],
             "priv_reqs": [ "nvs_flash", "esp_driver_uart", "ieee802154", "espressif__esp-zboss-lib", "espressif__esp-zigbee-lib", "espressif__esp_lcd_touch_cst816s", "espressif__esp_lvgl_port", "espressif__led_strip", "lvgl__lvgl" ],
             "managed_reqs": [],
             "managed_priv_reqs": [ "espressif__esp-zboss-lib", "espressif__esp-zigbee-lib", "espressif__esp_lcd_touch_cst816s", "espressif__esp_lvgl_port", "espressif__led_strip", "lvgl__lvgl" ],

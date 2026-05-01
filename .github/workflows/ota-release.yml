@@ -1,0 +1,105 @@
+name: ota-release
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'firmware/**'
+      - '.github/workflows/ota-release.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g., v1.0.2)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  firmware-ci:
+    if: |
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
+    runs-on: ubuntu-latest
+
+    env:
+      FW_DIR: firmware
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build firmware and OTA image (ESP-IDF)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0-beta2
+          target: esp32c6
+          path: firmware
+          command: idf.py build zigbee_ota_image
+
+  build-and-release-ota:
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    env:
+      FW_DIR: firmware
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Resolve release tag
+        id: release_tag
+        run: |
+          TAG_NAME="${{ github.event.inputs.tag }}"
+          if [ -z "$TAG_NAME" ]; then
+            TAG_NAME="${{ github.ref_name }}"
+          fi
+          if [ -z "$TAG_NAME" ]; then
+            echo "Release tag is required (example: v1.0.2)." >&2
+            exit 1
+          fi
+          echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Build firmware and OTA image (ESP-IDF)
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v6.0-beta2
+          target: esp32c6
+          path: firmware
+          command: idf.py build zigbee_ota_image
+
+      - name: Install OTA packaging dependencies
+        run: python -m pip install -r tools/requirements-ota.txt
+        working-directory: ${{ env.FW_DIR }}
+
+      - name: Build OTA feed index with GitHub Releases URLs
+        run: |
+          python tools/build_and_package_ota.py \
+            --project-dir . \
+            --skip-build \
+            --github-repo "${{ github.repository }}" \
+            --github-tag "${{ steps.release_tag.outputs.tag }}"
+        working-directory: ${{ env.FW_DIR }}
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            firmware/releases/ota-feed/*.ota
+            firmware/releases/ota-feed/*.json
+            firmware/build/kommando.bin
+            firmware/build/bootloader/bootloader.bin
+            firmware/build/partition_table/partition-table.bin

@@ -34,7 +34,13 @@
 
 #include "esp_log.h"
 #include "esp_err.h"
+#include "esp_check.h"
+#include "esp_timer.h"
+#include "esp_system.h"
+#include "esp_ota_ops.h"
 #include "esp_zigbee_core.h"
+#include "esp_zigbee_cluster.h"
+#include "esp_zigbee_ota.h"
 #include "zboss_api.h"
 #include "esp_zigbee_type.h"
 #include "nwk/esp_zigbee_nwk.h"
@@ -85,6 +91,45 @@ static bool       s_zb_joined    = false;
 static bool       s_ready_acked  = false;
 static uint16_t   s_ready_report_count = 0;
 static bool       s_recovery_factory_reset_pending = false;
+
+/* OTA runtime state */
+static const esp_partition_t *s_ota_partition = NULL;
+static esp_ota_handle_t s_ota_handle = 0;
+static bool s_ota_tagid_received = false;
+static uint16_t s_ota_server_addr = 0xFFFF;
+static uint8_t s_ota_server_ep = 0xFF;
+static bool s_ota_in_progress = false;
+
+#define OTA_ELEMENT_HEADER_LEN    6
+#define OTA_QUERY_DELAY_MS        8000
+
+typedef enum {
+    OTA_ELEMENT_TAG_UPGRADE_IMAGE = 0x0000,
+} ota_element_tag_t;
+
+static void zb_ota_reset_state(bool abort_session)
+{
+    if (abort_session && s_ota_in_progress) {
+        esp_err_t abort_ret = esp_ota_abort(s_ota_handle);
+        if (abort_ret != ESP_OK) {
+            ESP_LOGW(TAG, "esp_ota_abort failed: %s", esp_err_to_name(abort_ret));
+        }
+    }
+
+    s_ota_partition = NULL;
+    s_ota_handle = 0;
+    s_ota_in_progress = false;
+    s_ota_tagid_received = false;
+}
+
+static void ui_set_connection_state(bool connected, const char *msg)
+{
+    if (!g_lvgl_ready) return;
+    if (lvgl_port_lock(0)) {
+        ui_panel_set_connection_overlay(connected, msg);
+        lvgl_port_unlock();
+    }
+}
 
 static void zb_report_backlight_level_sched(uint8_t level)
 {
@@ -579,147 +624,391 @@ void zb_send_tile_state(uint8_t param)
      * which preserves tile index and is consumed by the external converter. */
 }
 
+static esp_err_t zb_extract_ota_payload(uint32_t total_size,
+                                        const uint8_t *payload,
+                                        uint16_t payload_size,
+                                        const uint8_t **out_payload,
+                                        uint16_t *out_len)
+{
+    static uint16_t tag_id = 0;
+    const uint8_t *data_ptr = NULL;
+    uint16_t data_len = 0;
+
+    if (!payload || !out_payload || !out_len) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (!s_ota_tagid_received) {
+        uint32_t element_len = 0;
+        if (payload_size <= OTA_ELEMENT_HEADER_LEN) {
+            return ESP_ERR_INVALID_ARG;
+        }
+
+        tag_id = *(const uint16_t *)payload;
+        element_len = *(const uint32_t *)(payload + sizeof(tag_id));
+        if ((element_len + OTA_ELEMENT_HEADER_LEN) != total_size) {
+            ESP_LOGW(TAG, "Invalid OTA element length [%lu/%lu]",
+                     (unsigned long)element_len,
+                     (unsigned long)total_size);
+            return ESP_ERR_INVALID_SIZE;
+        }
+
+        s_ota_tagid_received = true;
+        data_ptr = payload + OTA_ELEMENT_HEADER_LEN;
+        data_len = payload_size - OTA_ELEMENT_HEADER_LEN;
+    } else {
+        data_ptr = payload;
+        data_len = payload_size;
+    }
+
+    if (tag_id != OTA_ELEMENT_TAG_UPGRADE_IMAGE) {
+        ESP_LOGW(TAG, "Unsupported OTA tag id: 0x%04X", tag_id);
+        return ESP_ERR_NOT_SUPPORTED;
+    }
+
+    *out_payload = data_ptr;
+    *out_len = data_len;
+    return ESP_OK;
+}
+
+static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_message_t message)
+{
+    static uint32_t total_size = 0;
+    static uint32_t offset = 0;
+    static int64_t start_time_us = 0;
+    esp_err_t ret = ESP_OK;
+
+    if (message.info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
+        ESP_LOGW(TAG, "OTA status message parse failed: 0x%02X", message.info.status);
+        return ESP_FAIL;
+    }
+
+    switch (message.upgrade_status) {
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
+        ESP_LOGI(TAG, "-- OTA upgrade start");
+        zb_ota_reset_state(false);
+        start_time_us = esp_timer_get_time();
+        s_ota_partition = esp_ota_get_next_update_partition(NULL);
+        if (!s_ota_partition) {
+            ESP_LOGE(TAG, "No OTA partition available");
+            zb_ota_reset_state(false);
+            return ESP_ERR_NOT_FOUND;
+        }
+        ret = esp_ota_begin(s_ota_partition, OTA_SIZE_UNKNOWN, &s_ota_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_begin failed: %s", esp_err_to_name(ret));
+            zb_ota_reset_state(false);
+            return ret;
+        }
+        s_ota_in_progress = true;
+        break;
+
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_RECEIVE:
+        total_size = message.ota_header.image_size;
+        offset += message.payload_size;
+        ESP_LOGI(TAG, "-- OTA receive progress [%lu/%lu]",
+                 (unsigned long)offset,
+                 (unsigned long)total_size);
+
+        if (message.payload_size && message.payload) {
+            const uint8_t *ota_payload = NULL;
+            uint16_t ota_payload_len = 0;
+            ret = zb_extract_ota_payload(total_size,
+                                         message.payload,
+                                         message.payload_size,
+                                         &ota_payload,
+                                         &ota_payload_len);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to parse OTA payload: %s", esp_err_to_name(ret));
+                zb_ota_reset_state(true);
+                return ret;
+            }
+
+            ret = esp_ota_write(s_ota_handle, ota_payload, ota_payload_len);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "esp_ota_write failed: %s", esp_err_to_name(ret));
+                zb_ota_reset_state(true);
+                return ret;
+            }
+        }
+        break;
+
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_CHECK:
+        ret = (offset == total_size) ? ESP_OK : ESP_FAIL;
+        ESP_LOGI(TAG, "-- OTA check status: %s", esp_err_to_name(ret));
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "OTA image size mismatch, aborting session");
+            zb_ota_reset_state(true);
+            return ret;
+        }
+        break;
+
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_APPLY:
+        ESP_LOGI(TAG, "-- OTA apply");
+        break;
+
+    case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_FINISH:
+        ESP_LOGI(TAG, "-- OTA finish");
+        ESP_LOGI(TAG,
+                 "-- OTA info version=0x%08lX manuf=0x%04X image=0x%04X size=%lu elapsed=%lld ms",
+                 (unsigned long)message.ota_header.file_version,
+                 message.ota_header.manufacturer_code,
+                 message.ota_header.image_type,
+                 (unsigned long)message.ota_header.image_size,
+                 (long long)((esp_timer_get_time() - start_time_us) / 1000));
+
+        ret = esp_ota_end(s_ota_handle);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_end failed: %s", esp_err_to_name(ret));
+            zb_ota_reset_state(true);
+            return ret;
+        }
+
+        ret = esp_ota_set_boot_partition(s_ota_partition);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ota_set_boot_partition failed: %s", esp_err_to_name(ret));
+            zb_ota_reset_state(false);
+            return ret;
+        }
+
+        zb_ota_reset_state(false);
+        offset = 0;
+        total_size = 0;
+
+        ESP_LOGW(TAG, "OTA complete, restarting...");
+        esp_restart();
+        break;
+
+    default:
+        ESP_LOGI(TAG, "OTA status: %d", (int)message.upgrade_status);
+        break;
+    }
+
+    return ret;
+}
+
+static esp_err_t zb_ota_upgrade_query_image_resp_handler(esp_zb_zcl_ota_upgrade_query_image_resp_message_t message)
+{
+    if (message.info.status != ESP_ZB_ZCL_STATUS_SUCCESS) {
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG,
+             "OTA image found: server=0x%04X ep=%u version=0x%08lX manuf=0x%04X type=0x%04X size=%lu",
+             message.server_addr.u.short_addr,
+             message.server_endpoint,
+             (unsigned long)message.file_version,
+             message.manufacturer_code,
+             message.image_type,
+             (unsigned long)message.image_size);
+
+    if (message.manufacturer_code != ZB_OTA_MANUFACTURER_CODE ||
+        message.image_type != ZB_OTA_IMAGE_TYPE) {
+        ESP_LOGW(TAG, "Rejecting OTA image: manufacturer/image_type mismatch");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (message.file_version <= ZB_OTA_FILE_VERSION) {
+        ESP_LOGI(TAG, "Rejecting OTA image: version not newer than running image");
+        return ESP_ERR_INVALID_VERSION;
+    }
+
+    ESP_LOGI(TAG, "Approving OTA image upgrade");
+    return ESP_OK;
+}
+
+static void zb_zdo_match_desc_handler(esp_zb_zdp_status_t zdo_status,
+                                      uint16_t addr,
+                                      uint8_t endpoint,
+                                      void *user_ctx)
+{
+    (void)user_ctx;
+    if (zdo_status != ESP_ZB_ZDP_STATUS_SUCCESS) {
+        ESP_LOGW(TAG, "No OTA server discovered via Match Descriptor");
+        return;
+    }
+
+    s_ota_server_addr = addr;
+    s_ota_server_ep = endpoint;
+
+    /* API signature in current SDK is inconsistent; Espressif examples pass (addr, ep). */
+    esp_zb_ota_upgrade_client_query_interval_set(ZB_FIRST_ENDPOINT, ZB_OTA_QUERY_INTERVAL_MIN);
+    esp_zb_ota_upgrade_client_query_image_req(addr, endpoint);
+
+    ESP_LOGI(TAG,
+             "Query OTA image from server 0x%04X ep=%u interval=%u min",
+             s_ota_server_addr,
+             s_ota_server_ep,
+             ZB_OTA_QUERY_INTERVAL_MIN);
+}
+
+static void zb_query_ota_server(uint8_t param)
+{
+    (void)param;
+    esp_zb_zdo_match_desc_req_param_t req = {0};
+    uint16_t cluster_list[] = { ESP_ZB_ZCL_CLUSTER_ID_OTA_UPGRADE };
+
+    req.addr_of_interest = 0x0000;
+    req.dst_nwk_addr = 0x0000;
+    req.num_in_clusters = 1;
+    req.num_out_clusters = 0;
+    req.profile_id = ESP_ZB_AF_HA_PROFILE_ID;
+    req.cluster_list = cluster_list;
+
+    esp_zb_zdo_match_cluster(&req, zb_zdo_match_desc_handler, NULL);
+}
+
 /* ============================================================
    ACTION HANDLER — receives writes from Z2M / HA
    ============================================================ */
 static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t cb_id, const void *msg)
 {
-    if (cb_id != ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID) {
-        ESP_LOGD(TAG, "Unhandled cb_id=0x%04x", cb_id);
-        return ESP_OK;
-    }
+    switch (cb_id) {
+    case ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID:
+        return zb_ota_upgrade_status_handler(*(esp_zb_zcl_ota_upgrade_value_message_t *)msg);
 
-    const esp_zb_zcl_set_attr_value_message_t *m =
-        (const esp_zb_zcl_set_attr_value_message_t *)msg;
+    case ESP_ZB_CORE_OTA_UPGRADE_QUERY_IMAGE_RESP_CB_ID:
+        return zb_ota_upgrade_query_image_resp_handler(*(esp_zb_zcl_ota_upgrade_query_image_resp_message_t *)msg);
 
-    ESP_LOGI(TAG, "SET_ATTR cluster=0x%04X attr=0x%04X", m->info.cluster, m->attribute.id);
+    case ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID: {
+        const esp_zb_zcl_set_attr_value_message_t *m =
+            (const esp_zb_zcl_set_attr_value_message_t *)msg;
 
-    if (m->info.cluster != ZB_CUSTOM_CLUSTER_ID) return ESP_OK;
+        ESP_LOGI(TAG, "SET_ATTR cluster=0x%04X attr=0x%04X", m->info.cluster, m->attribute.id);
 
-    /* Any successful write from HA/Z2M means link/path is alive.
-     * Stop READY retries to avoid noisy 3/3 logs when attr 0x0000 ack isn't used. */
-    s_ready_acked = true;
-    s_ready_report_count = 0;
+        if (m->info.cluster != ZB_CUSTOM_CLUSTER_ID) return ESP_OK;
 
-    /* ---- Command payload attr (0x0000) ---- */
-    if (m->attribute.id == ZB_ATTR_PAYLOAD_ID) {
-        uint8_t *data = (uint8_t *)m->attribute.data.value;
-        uint8_t  len  = data[0];
-        if (len > 63) len = 63;
+        /* Any successful write from HA/Z2M means link/path is alive.
+         * Stop READY retries to avoid noisy 3/3 logs when attr 0x0000 ack isn't used. */
+        s_ready_acked = true;
+        s_ready_report_count = 0;
+        ui_set_connection_state(true, NULL);
 
-        static char buf[64];
-        memcpy(buf, data + 1, len);
-        buf[len] = '\0';
-        ESP_LOGI(TAG, "<<< Write: [%s]", buf);
+        /* ---- Command payload attr (0x0000) ---- */
+        if (m->attribute.id == ZB_ATTR_PAYLOAD_ID) {
+            uint8_t *data = (uint8_t *)m->attribute.data.value;
+            uint8_t  len  = data[0];
+            if (len > 63) len = 63;
 
-        /* READY ack from Z2M — no action besides stopping retries */
-        if (strcmp(buf, "A:READY") == 0 || strcmp(buf, "READY_ACK") == 0) {
-            s_ready_report_count = 0;
+            static char buf[64];
+            memcpy(buf, data + 1, len);
+            buf[len] = '\0';
+            ESP_LOGI(TAG, "<<< Write: [%s]", buf);
+
+            /* READY ack from Z2M — no action besides stopping retries */
+            if (strcmp(buf, "A:READY") == 0 || strcmp(buf, "READY_ACK") == 0) {
+                s_ready_report_count = 0;
+                return ESP_OK;
+            }
+
+            if (should_drop_duplicate_cfg(buf)) return ESP_OK;
+
+            /* Persist C: tile config to NVS */
+            char tmp[64];
+            strncpy(tmp, buf, sizeof(tmp) - 1);
+            char *sp, *cmd = strtok_r(tmp, ":", &sp), *id_str = strtok_r(NULL, ":", &sp);
+            if (cmd && id_str && strcmp(cmd, "C") == 0) {
+                int tid = atoi(id_str);
+                if (tid >= 0 && tid < MAX_TILES) save_tile_to_nvs(tid, buf);
+            }
+
+            if (!g_lvgl_ready) {
+                ESP_LOGW(TAG, "LVGL not ready — processing without UI: [%s]", buf);
+            }
+            process_ha_command(buf);
             return ESP_OK;
         }
 
-        if (should_drop_duplicate_cfg(buf)) return ESP_OK;
-
-        /* Persist C: tile config to NVS */
-        char tmp[64];
-        strncpy(tmp, buf, sizeof(tmp) - 1);
-        char *sp, *cmd = strtok_r(tmp, ":", &sp), *id_str = strtok_r(NULL, ":", &sp);
-        if (cmd && id_str && strcmp(cmd, "C") == 0) {
-            int tid = atoi(id_str);
-            if (tid >= 0 && tid < MAX_TILES) save_tile_to_nvs(tid, buf);
+        /* ---- Backlight level (0x0010) — UINT8 ---- */
+        if (m->attribute.id == ZB_ATTR_BACKLIGHT_ID) {
+            uint8_t val = *(uint8_t *)m->attribute.data.value;
+            g_backlight_level = val;
+            s_attr_backlight  = val;
+            backlight_set(val);
+            save_setting_u8(NVS_KEY_BACKLIGHT, val);
+            ESP_LOGI(TAG, "Backlight → %d", val);
+            return ESP_OK;
         }
 
-        if (!g_lvgl_ready) {
-            ESP_LOGW(TAG, "LVGL not ready — processing without UI: [%s]", buf);
+        /* ---- Screen timeout (0x0011) — UINT16 ---- */
+        if (m->attribute.id == ZB_ATTR_SCR_TIMEOUT_ID) {
+            uint16_t val = *(uint16_t *)m->attribute.data.value;
+            g_screen_timeout_sec = val;
+            s_attr_scr_timeout   = val;
+            save_setting_u16(NVS_KEY_SCREEN_TIMEOUT, val);
+            ESP_LOGI(TAG, "Screen timeout → %ds", val);
+            return ESP_OK;
         }
-        process_ha_command(buf);
-        return ESP_OK;
-    }
 
-    /* ---- Backlight level (0x0010) — UINT8 ---- */
-    if (m->attribute.id == ZB_ATTR_BACKLIGHT_ID) {
-        uint8_t val = *(uint8_t *)m->attribute.data.value;
-        g_backlight_level = val;
-        s_attr_backlight  = val;
-        backlight_set(val);
-        save_setting_u8(NVS_KEY_BACKLIGHT, val);
-        ESP_LOGI(TAG, "Backlight → %d", val);
-        return ESP_OK;
-    }
-
-    /* ---- Screen timeout (0x0011) — UINT16 ---- */
-    if (m->attribute.id == ZB_ATTR_SCR_TIMEOUT_ID) {
-        uint16_t val = *(uint16_t *)m->attribute.data.value;
-        g_screen_timeout_sec = val;
-        s_attr_scr_timeout   = val;
-        save_setting_u16(NVS_KEY_SCREEN_TIMEOUT, val);
-        ESP_LOGI(TAG, "Screen timeout → %ds", val);
-        return ESP_OK;
-    }
-
-    /* ---- Dim level (0x0012) — UINT8 ---- */
-    if (m->attribute.id == ZB_ATTR_DIM_LEVEL_ID) {
-        uint8_t val = *(uint8_t *)m->attribute.data.value;
-        g_dim_level      = val;
-        s_attr_dim_level = val;
-        save_setting_u8(NVS_KEY_DIM_LEVEL, val);
-        ESP_LOGI(TAG, "Dim level → %d", val);
-        return ESP_OK;
-    }
-
-    /* ---- Night mode (0x0013) — BOOLEAN ---- */
-    if (m->attribute.id == ZB_ATTR_NIGHT_MODE_ID) {
-        uint8_t val = *(uint8_t *)m->attribute.data.value;
-        g_night_mode    = (bool)val;
-        s_attr_night_mode = val;
-        save_setting_u8(NVS_KEY_NIGHT_MODE, val);
-
-        /* Apply brightness change immediately */
-        uint8_t level = g_night_mode ? g_night_brightness : g_backlight_level;
-        backlight_set(level);
-
-        /* Repaint tile "on" colours */
-        if (lvgl_port_lock(0)) {
-            ui_panel_set_night_mode(g_night_mode);
-            lvgl_port_unlock();
+        /* ---- Dim level (0x0012) — UINT8 ---- */
+        if (m->attribute.id == ZB_ATTR_DIM_LEVEL_ID) {
+            uint8_t val = *(uint8_t *)m->attribute.data.value;
+            g_dim_level      = val;
+            s_attr_dim_level = val;
+            save_setting_u8(NVS_KEY_DIM_LEVEL, val);
+            ESP_LOGI(TAG, "Dim level → %d", val);
+            return ESP_OK;
         }
-        ESP_LOGI(TAG, "Night mode → %s", g_night_mode ? "ON" : "OFF");
+
+        /* ---- Night mode (0x0013) — BOOLEAN ---- */
+        if (m->attribute.id == ZB_ATTR_NIGHT_MODE_ID) {
+            uint8_t val = *(uint8_t *)m->attribute.data.value;
+            g_night_mode    = (bool)val;
+            s_attr_night_mode = val;
+            save_setting_u8(NVS_KEY_NIGHT_MODE, val);
+
+            /* Apply brightness change immediately */
+            uint8_t level = g_night_mode ? g_night_brightness : g_backlight_level;
+            backlight_set(level);
+
+            /* Repaint tile "on" colours */
+            if (lvgl_port_lock(0)) {
+                ui_panel_set_night_mode(g_night_mode);
+                lvgl_port_unlock();
+            }
+            ESP_LOGI(TAG, "Night mode → %s", g_night_mode ? "ON" : "OFF");
+            return ESP_OK;
+        }
+
+        /* ---- Night brightness (0x0014) — UINT8 ---- */
+        if (m->attribute.id == ZB_ATTR_NIGHT_BL_ID) {
+            uint8_t val = *(uint8_t *)m->attribute.data.value;
+            g_night_brightness = val;
+            s_attr_night_bl    = val;
+            save_setting_u8(NVS_KEY_NIGHT_BL, val);
+            if (g_night_mode) backlight_set(val);
+            ESP_LOGI(TAG, "Night brightness → %d", val);
+            return ESP_OK;
+        }
+
+        /* ---- Deep sleep enable (0x0015) — BOOLEAN ---- */
+        if (m->attribute.id == ZB_ATTR_DEEP_SLEEP_ID) {
+            uint8_t val = *(uint8_t *)m->attribute.data.value;
+            g_deep_sleep_enabled = (bool)val;
+            s_attr_deep_sleep    = val;
+            save_setting_u8(NVS_KEY_DEEP_SLEEP_EN, val);
+            ESP_LOGI(TAG, "Deep sleep enable → %s", val ? "ON" : "OFF");
+            return ESP_OK;
+        }
+
+        /* ---- Sleep timeout (0x0016) — UINT16 ---- */
+        if (m->attribute.id == ZB_ATTR_SLEEP_TIMEOUT_ID) {
+            uint16_t val = *(uint16_t *)m->attribute.data.value;
+            g_sleep_timeout_sec   = val;
+            s_attr_sleep_timeout  = val;
+            save_setting_u16(NVS_KEY_SLEEP_TIMEOUT, val);
+            ESP_LOGI(TAG, "Sleep timeout → %ds", val);
+            return ESP_OK;
+        }
+
+        ESP_LOGD(TAG, "Unhandled attr 0x%04X on cluster 0x%04X", m->attribute.id, m->info.cluster);
         return ESP_OK;
     }
 
-    /* ---- Night brightness (0x0014) — UINT8 ---- */
-    if (m->attribute.id == ZB_ATTR_NIGHT_BL_ID) {
-        uint8_t val = *(uint8_t *)m->attribute.data.value;
-        g_night_brightness = val;
-        s_attr_night_bl    = val;
-        save_setting_u8(NVS_KEY_NIGHT_BL, val);
-        if (g_night_mode) backlight_set(val);
-        ESP_LOGI(TAG, "Night brightness → %d", val);
+    default:
+        ESP_LOGD(TAG, "Unhandled cb_id=0x%04x", cb_id);
         return ESP_OK;
     }
-
-    /* ---- Deep sleep enable (0x0015) — BOOLEAN ---- */
-    if (m->attribute.id == ZB_ATTR_DEEP_SLEEP_ID) {
-        uint8_t val = *(uint8_t *)m->attribute.data.value;
-        g_deep_sleep_enabled = (bool)val;
-        s_attr_deep_sleep    = val;
-        save_setting_u8(NVS_KEY_DEEP_SLEEP_EN, val);
-        ESP_LOGI(TAG, "Deep sleep enable → %s", val ? "ON" : "OFF");
-        return ESP_OK;
-    }
-
-    /* ---- Sleep timeout (0x0016) — UINT16 ---- */
-    if (m->attribute.id == ZB_ATTR_SLEEP_TIMEOUT_ID) {
-        uint16_t val = *(uint16_t *)m->attribute.data.value;
-        g_sleep_timeout_sec   = val;
-        s_attr_sleep_timeout  = val;
-        save_setting_u16(NVS_KEY_SLEEP_TIMEOUT, val);
-        ESP_LOGI(TAG, "Sleep timeout → %ds", val);
-        return ESP_OK;
-    }
-
-    ESP_LOGD(TAG, "Unhandled attr 0x%04X on cluster 0x%04X", m->attribute.id, m->info.cluster);
-    return ESP_OK;
 }
 
 /* ============================================================
@@ -750,6 +1039,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     switch (sig_type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
         ESP_LOGI(TAG, "Skip startup → init");
+        ui_set_connection_state(false, "Starting Zigbee...");
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
         break;
 
@@ -757,6 +1047,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         ESP_LOGI(TAG, "First start → steering");
         s_zb_joined = false;
         s_ready_report_count = 0;
+        ui_set_connection_state(false, "Pairing...\nWaiting for coordinator");
         led_set_pattern(LED_PATTERN_PAIRING);
         esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
         break;
@@ -778,15 +1069,18 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             s_zb_joined = true;
             s_ready_acked = false;
             s_ready_report_count = 0;
+            ui_set_connection_state(true, NULL);
             led_set_pattern(LED_PATTERN_IDLE_BREATHING);
             esp_zb_scheduler_alarm(zb_setup_reporting, 0, 500);
             esp_zb_scheduler_alarm(zb_send_device_announce, 0, 1200);
             esp_zb_scheduler_alarm(zb_report_ready, 0, 2200);
+            esp_zb_scheduler_alarm(zb_query_ota_server, 0, OTA_QUERY_DELAY_MS);
             zb_log_network_identity();
         } else {
             ESP_LOGW(TAG, "Reboot — network not restored/invalid, scheduling steering in 1s");
             s_ready_report_count = 0;
             s_zb_joined = false;
+            ui_set_connection_state(false, "Reconnecting to Zigbee...");
             led_set_pattern(LED_PATTERN_PAIRING);
             esp_zb_scheduler_alarm(zb_start_steering, 0, 1000);
         }
@@ -797,12 +1091,14 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             s_zb_joined = true;
             s_ready_acked = false;
             s_ready_report_count = 0;
+            ui_set_connection_state(true, NULL);
             led_set_pattern(LED_PATTERN_IDLE_BREATHING);
             /* Force reporting refresh to rebuild coordinator forwarding tables */
             esp_zb_scheduler_alarm(zb_refresh_reporting, 0, 500);
             esp_zb_scheduler_alarm(zb_report_basic_info, 0, 700);
             esp_zb_scheduler_alarm(zb_send_device_announce, 0, 1200);
             esp_zb_scheduler_alarm(zb_report_ready, 0, 2200);
+            esp_zb_scheduler_alarm(zb_query_ota_server, 0, OTA_QUERY_DELAY_MS);
             esp_zb_ieee_addr_t addr;
             esp_zb_get_long_address(addr);
             ESP_LOGI(TAG,
@@ -812,6 +1108,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             zb_log_network_identity();
         } else {
             s_zb_joined = false;
+            ui_set_connection_state(false, "Connection failed\nRetrying...");
             led_set_pattern(LED_PATTERN_PAIRING);
             ESP_LOGW(TAG, "Steering failed (%s) — retry in 2s", esp_err_to_name(err_status));
             esp_zb_scheduler_alarm(zb_start_steering, 0, 2000);
@@ -820,6 +1117,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
 
     case ESP_ZB_ZDO_SIGNAL_LEAVE:
         s_zb_joined = false;
+        ui_set_connection_state(false, "Disconnected\nRejoining...");
         led_set_pattern(LED_PATTERN_PAIRING);
         ESP_LOGI(TAG, "Left network — rejoining in 3s");
         esp_zb_scheduler_alarm(zb_start_steering, 0, 3000);
@@ -871,6 +1169,26 @@ static void zigbee_init(void)
         esp_zb_attribute_list_t *on_off_cli    = esp_zb_on_off_cluster_create(NULL);
         esp_zb_attribute_list_t *level_ctrl_srv = esp_zb_level_cluster_create(NULL);
         esp_zb_attribute_list_t *level_ctrl_cli = esp_zb_level_cluster_create(NULL);
+
+        esp_zb_ota_cluster_cfg_t ota_cfg = {
+            .ota_upgrade_file_version = ZB_OTA_FILE_VERSION,
+            .ota_upgrade_downloaded_file_ver = ZB_OTA_DOWNLOADED_FILE_VERSION,
+            .ota_upgrade_manufacturer = ZB_OTA_MANUFACTURER_CODE,
+            .ota_upgrade_image_type = ZB_OTA_IMAGE_TYPE,
+            .ota_min_block_reque = 0,
+            .ota_upgrade_file_offset = ESP_ZB_ZCL_OTA_UPGRADE_FILE_OFFSET_DEF_VALUE,
+            .ota_upgrade_server_id = ESP_ZB_ZCL_OTA_UPGRADE_SERVER_DEF_VALUE,
+            .ota_image_upgrade_status = ESP_ZB_ZCL_OTA_UPGRADE_IMAGE_STATUS_DEF_VALUE,
+        };
+        esp_zb_attribute_list_t *ota_cli = esp_zb_ota_cluster_create(&ota_cfg);
+        esp_zb_zcl_ota_upgrade_client_variable_t ota_client_variable = {
+            .timer_query = ESP_ZB_ZCL_OTA_UPGRADE_QUERY_TIMER_COUNT_DEF,
+            .hw_version = ZB_OTA_HW_VERSION,
+            .max_data_size = ZB_OTA_MAX_DATA_SIZE,
+        };
+        esp_zb_ota_cluster_add_attr(ota_cli, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_CLIENT_DATA_ID, &ota_client_variable);
+        esp_zb_ota_cluster_add_attr(ota_cli, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ADDR_ID, &s_ota_server_addr);
+        esp_zb_ota_cluster_add_attr(ota_cli, ESP_ZB_ZCL_ATTR_OTA_UPGRADE_SERVER_ENDPOINT_ID, &s_ota_server_ep);
 
         /* Custom cluster 0xFC11 */
         esp_zb_attribute_list_t *ui = esp_zb_zcl_attr_list_create(ZB_CUSTOM_CLUSTER_ID);
@@ -936,6 +1254,7 @@ static void zigbee_init(void)
         esp_zb_cluster_list_add_on_off_cluster(clusters, on_off_cli,       ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
         esp_zb_cluster_list_add_level_cluster(clusters,  level_ctrl_srv,   ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
         esp_zb_cluster_list_add_level_cluster(clusters,  level_ctrl_cli,   ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
+        esp_zb_cluster_list_add_ota_cluster(clusters, ota_cli,             ESP_ZB_ZCL_CLUSTER_CLIENT_ROLE);
         esp_zb_cluster_list_add_custom_cluster(clusters, ui,         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
         esp_zb_endpoint_config_t ep_cfg = {

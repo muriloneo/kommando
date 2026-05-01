@@ -58,6 +58,14 @@ void ui_panel_update_dimmer_badge(int tile_id, bool dimmable);
 void ui_panel_hide_dimmer(void);
 
 /**
+ * Show/hide the full-screen connection overlay.
+ *
+ * @param connected    true = hide overlay, false = show overlay
+ * @param status_text  Optional text shown while overlay is visible
+ */
+void ui_panel_set_connection_overlay(bool connected, const char *status_text);
+
+/**
  * Return the current "tile on" background colour.
  * Accounts for whether night mode is active.
  * Used by commands.c when applying an S: state-change command.

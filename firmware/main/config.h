@@ -21,8 +21,26 @@
 
 #pragma once
 
+#include "sdkconfig.h"
 #include "driver/gpio.h"
 #include "driver/spi_common.h"
+
+/* Fallbacks for environments where Kconfig symbols are not generated yet. */
+#ifndef CONFIG_KOMMANDO_OTA_IMAGE_TYPE
+#define CONFIG_KOMMANDO_OTA_IMAGE_TYPE 0x1011
+#endif
+
+#ifndef CONFIG_KOMMANDO_OTA_HW_VERSION
+#define CONFIG_KOMMANDO_OTA_HW_VERSION 0x0101
+#endif
+
+#ifndef CONFIG_KOMMANDO_OTA_QUERY_INTERVAL_MIN
+#define CONFIG_KOMMANDO_OTA_QUERY_INTERVAL_MIN 60
+#endif
+
+#ifndef CONFIG_KOMMANDO_OTA_MAX_DATA_SIZE
+#define CONFIG_KOMMANDO_OTA_MAX_DATA_SIZE 223
+#endif
 
 /* ============================================================
    FIRMWARE VERSION (semantic versioning)
@@ -34,22 +52,38 @@
 
 /* ============================================================
    HARDWARE PINS — LCD (ST7789V2, SPI)
+   ──────────────────────────────────────────────────────────────
+   FPC Pin   Wire colour   GPIO   Function
+   ──────    ────────────  ────   ────────
+     3       Orange        7      SPI MOSI
+     4       Green         6      SPI CLK
+     5       Blue         10      SPI CS
+     6       Purple       11      Data / Command (DC)
+     7       Gray          3      LCD Reset
+     8       Orange        2      Backlight (LEDC PWM)
    ============================================================ */
-#define PIN_LCD_BL       GPIO_NUM_2   /* Backlight — LEDC PWM       wire 8  (Orange)  */
-#define PIN_LCD_RST      GPIO_NUM_3   /* Panel reset                wire 7  (Gray)    */
-#define PIN_LCD_DC       GPIO_NUM_11  /* Data / command select      wire 6  (Purple)  */
-#define PIN_LCD_CS       GPIO_NUM_10  /* SPI chip select            wire 5  (Blue)    */
-#define PIN_LCD_CLK      GPIO_NUM_6   /* SPI clock                  wire 4  (Green)   */
-#define PIN_LCD_MOSI     GPIO_NUM_7   /* SPI MOSI                   wire 3  (Orange)  */
+#define PIN_LCD_MOSI     GPIO_NUM_7   /* FPC 3  (Orange)  — SPI MOSI           */
+#define PIN_LCD_CLK      GPIO_NUM_6   /* FPC 4  (Green)   — SPI clock          */
+#define PIN_LCD_CS       GPIO_NUM_10  /* FPC 5  (Blue)    — SPI chip select    */
+#define PIN_LCD_DC       GPIO_NUM_11  /* FPC 6  (Purple)  — Data/command       */
+#define PIN_LCD_RST      GPIO_NUM_3   /* FPC 7  (Gray)    — Panel reset        */
+#define PIN_LCD_BL       GPIO_NUM_2   /* FPC 8  (Orange)  — Backlight (PWM)    */
 
 /* ============================================================
-   HARDWARE PINS — TOUCH (CST816, I2C)
+   HARDWARE PINS — TOUCH (CST816S, I2C)
+   ──────────────────────────────────────────────────────────────
+   FPC Pin   Wire colour   GPIO   Function
+   ──────    ────────────  ────   ────────
+     9       Green         0      I2C SDA
+    10       Blue          1      I2C SCL
+    12       Gray          4      INT (active low, deep-sleep wake)
+    16       —            20      Touch reset
    ============================================================ */
-#define PIN_TOUCH_SDA    GPIO_NUM_0   /* I2C data                   wire 9  (Green)   */
-#define PIN_TOUCH_SCL    GPIO_NUM_1   /* I2C clock                  wire 10 (Blue)    */
-#define PIN_TOUCH_RST    GPIO_NUM_20  /* Touch controller reset     wire 11 (Purple)  */
-#define PIN_TOUCH_INT    GPIO_NUM_19  /* CST816 INT (active low)    wire 12 (Gray)    */
-                                          /* For deep sleep wakeup, must be GPIO0-7 */
+#define PIN_TOUCH_SDA    GPIO_NUM_0   /* FPC 9  (Green)   — I2C data           */
+#define PIN_TOUCH_SCL    GPIO_NUM_1   /* FPC 10 (Blue)    — I2C clock          */
+#define PIN_TOUCH_INT    GPIO_NUM_4   /* FPC 12 (Gray)    — CST816 INT         */
+                                      /* Deep-sleep wake capable (C6: GPIO 0-7) */
+#define PIN_TOUCH_RST    GPIO_NUM_20  /* FPC 16           — Touch reset        */
 
 /* ============================================================
    HARDWARE PINS — PERIPHERALS
@@ -112,6 +146,21 @@
 #define ZB_MANUFACTURER_NAME   "Kommando"
 #define ZB_MODEL_ID            "Kommando_Nano"
 #define ZB_TX_POWER            20              /* dBm                              */
+
+/* Zigbee OTA identity (must match OTA image metadata and Z2M index) */
+#define ZB_OTA_MANUFACTURER_CODE   0x1234
+#define ZB_OTA_IMAGE_TYPE          CONFIG_KOMMANDO_OTA_IMAGE_TYPE
+#define ZB_OTA_HW_VERSION          CONFIG_KOMMANDO_OTA_HW_VERSION
+#define ZB_OTA_QUERY_INTERVAL_MIN  CONFIG_KOMMANDO_OTA_QUERY_INTERVAL_MIN
+#define ZB_OTA_MAX_DATA_SIZE       CONFIG_KOMMANDO_OTA_MAX_DATA_SIZE
+
+/* OTA file version encoding: app_release.app_build.stack_release.stack_build */
+#define ZB_OTA_FILE_VERSION \
+   (((uint32_t)(FW_VERSION_MAJOR) << 24) | \
+    ((uint32_t)(FW_VERSION_MINOR) << 16) | \
+    ((uint32_t)(FW_VERSION_PATCH) << 8)  | \
+    ((uint32_t)(0x00)))
+#define ZB_OTA_DOWNLOADED_FILE_VERSION 0xFFFFFFFF
 
 /* ============================================================
    ZIGBEE — ENDPOINTS & CLUSTERS

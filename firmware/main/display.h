@@ -35,6 +35,12 @@ lv_display_t *display_init(void);
 extern volatile bool g_screen_active;
 
 /**
+ * True when LCD is in hardware sleep state (SLPIN path).
+ * Used by tile_event_cb() to distinguish wake-from-dim vs wake-from-sleep.
+ */
+extern volatile bool g_screen_hw_sleeping;
+
+/**
  * True once LVGL port has been initialized and is safe to lock.
  */
 extern volatile bool g_lvgl_ready;

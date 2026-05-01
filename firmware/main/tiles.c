@@ -141,12 +141,17 @@ void tile_event_cb(lv_event_t *e)
 
     /* Capture screen state BEFORE calling screen_wake (which may modify it) */
     bool was_active = g_screen_active;
+    bool was_hw_sleeping = g_screen_hw_sleeping;
 
     /* Reset the inactivity timer so the screen stays on / wakes up */
     screen_wake();
 
-    /* If the screen was dimmed or sleeping, wake-only for click; allow long-press */
-    if (!was_active && code != LV_EVENT_LONG_PRESSED) {
+    /*
+     * Wake behavior:
+     * - From DIMMED: first click only wakes (no toggle), prevents accidental toggles.
+     * - From SCREEN_SLEEP: allow the first click to both wake and toggle.
+     */
+    if (!was_active && !was_hw_sleeping && code != LV_EVENT_LONG_PRESSED) {
         ESP_LOGI(TAG, "Wake tap — tile action suppressed");
         return;
     }

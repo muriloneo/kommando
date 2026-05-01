@@ -1,4 +1,30 @@
 {
+  // =============================================================================
+  // Kommando Firmware Workspace Configuration (Monorepo Subdirectory)
+  // =============================================================================
+  //
+  // IMPORTANT: This workspace is opened at firmware/, but the git repository root
+  // is at the parent level (kommando/). This is a monorepo structure.
+  //
+  // Repository structure:
+  //   kommando/                    ← Git root (.git is here)
+  //   ├── firmware/                ← THIS WORKSPACE (VS Code opens here)
+  //   │   ├── main/
+  //   │   ├── tools/
+  //   │   ├── .github/copilot-instructions.md  ← Firmware-specific instructions
+  //   │   └── .vscode/             ← This folder
+  //   ├── z2m-converter/
+  //   ├── home-assistant-blueprint/
+  //   └── .github/                 ← Root repo config (CI/CD, shared instructions)
+  //
+  // When opening this folder in VS Code, git operations and paths work correctly:
+  // - Git remote: https://github.com/muriloneo/kommando.git
+  // - Git root detection: automatic (found at parent level)
+  // - Copilot instructions: loaded from firmware/.github/copilot-instructions.md
+  // - RTK context: run from firmware/ folder via tools/ai-context.sh
+  // =============================================================================
+
+  // ESP-IDF Extension Configuration
   "idf.portWin": "COM3",
   "idf.openOcdConfigs": [
     "board/esp32c6-builtin.cfg"
@@ -8,5 +34,35 @@
   },
   "idf.flashType": "UART",
   "idf.monitorPort": "COM3",
-  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0-beta2\\esp-idf"
+  "idf.currentSetup": "C:\\Espressif\\.espressif\\v6.0-beta2\\esp-idf",
+
+  // VS Code Search/Explorer (exclude large directories)
+  "search.exclude": {
+    "**/build": true,
+    "**/managed_components": true,
+    "**/.git": true
+  },
+  "files.exclude": {
+    "**/build": true,
+    "**/managed_components": true,
+    "**/.git": true
+  },
+
+  // File associations for ESP-IDF project files
+  "files.associations": {
+    "idf_component.yml": "yaml",
+    "Kconfig.projbuild": "text",
+    "CMakeLists.txt": "cmake"
+  },
+
+  // Git integration: git root is parent, workspace is firmware/
+  "git.autoRepositoryDetection": "openEditors",
+
+  // Editor defaults
+  "editor.formatOnSave": false,
+  "editor.tabSize": 4,
+  "editor.insertSpaces": true,
+
+  // Terminal: start in firmware folder (workspace root)
+  "terminal.integrated.cwd": "${workspaceFolder}"
 }

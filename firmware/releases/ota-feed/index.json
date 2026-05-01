@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "entries": [
+    {
+      "modelId": "Kommando_Nano",
+      "fileName": "kommando_1.0.0_0x01000000.ota",
+      "url": "https://github.com/muriloneo/kommando/releases/download/v1.0.2/kommando_1.0.0_0x01000000.ota",
+      "manufacturerCode": 4660,
+      "imageType": 4113,
+      "fileVersion": 16777216,
+      "hardwareVersion": 257,
+      "sha512": "d9445f3011988b1b24669ee74eaf4b9422e52e13c1a2f90a782323d46cd561099fb7423cc6bd51f96be811ee0b1c59b8bd5dc844e3a8179d18673a5660cfe6b4",
+      "force": false,
+      "createdAt": "2026-03-29T17:23:44Z"
+    }
+  ],
+  "updatedAt": "2026-03-29T17:23:44Z"
+}

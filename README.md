@@ -150,6 +150,43 @@ external_converters:
 
 Pin map is in headers under `firmware/main/`.
 
+### Wiring (FPC cable pins -> ESP32-C6 GPIO)
+
+#### Display (ST7789)
+
+- Pin 3 (Orange) -> GPIO7
+- Pin 4 (Green) -> GPIO6
+- Pin 5 (Blue) -> GPIO10
+- Pin 6 (Purple) -> GPIO11
+- Pin 7 (Gray) -> GPIO3
+- Pin 8 (Orange) -> GPIO2
+
+#### Touch (CST816S)
+
+- Pin 9 (Green) -> GPIO0
+- Pin 10 (Blue) -> GPIO1
+- Pin 11 (Purple) -> GPIO20
+- Pin 12 (Gray) -> GPIO19
+
+---
+
+## OTA (WIP)
+
+OTA is currently **WIP** for end-to-end production rollout.
+
+Current status:
+
+- Zigbee OTA client logic is implemented in firmware.
+- OTA packaging helper exists (`tools/build_and_package_ota.py` and `tools/build_and_package_ota.ps1`).
+- Duplicate target/version publish attempts are ignored gracefully.
+- Runtime OTA errors are handled gracefully (abort/reset state, no hard crash flow).
+
+Reference docs:
+
+- `firmware/releases/README_OTA.md`
+- `firmware/releases/OTA_EXPECTATIONS.md`
+- `firmware/releases/OTA_PIPELINE.md`
+
 ---
 
 ## Device identity
@@ -193,6 +230,6 @@ See `LICENSE` for details.
 ## TODO
 
 - [ ] Fix link for importing blueprint directly
-- [ ] Add OTA
-- [ ] Add GitHub pipeline for releases
+- [ ] OTA (WIP) -> complete production validation and rollout docs
+- [x] Add GitHub pipeline for releases (`.github/workflows/ota-release.yml`)
 

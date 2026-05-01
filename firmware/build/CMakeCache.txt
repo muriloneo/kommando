@@ -360,7 +360,7 @@ Mbed TLS_SOURCE_DIR:STATIC=C:/Espressif/.espressif/v6.0-beta2/esp-idf/components
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1
 
 //No help, variable specified on the command line.
-SDKCONFIG:UNINITIALIZED=c:\codes\esp32\kommando\firmware\sdkconfig
+SDKCONFIG:UNINITIALIZED=C:\codes\esp32\kommando\firmware\sdkconfig
 
 //Value Computed by CMake
 TF-PSA-Crypto_BINARY_DIR:STATIC=C:/codes/esp32/kommando/firmware/build/esp-idf/mbedtls/mbedtls/tf-psa-crypto

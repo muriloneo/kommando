@@ -261,7 +261,7 @@ IGNORE_EXTRA_COMPONENT:UNINITIALIZED=
 PROJECT_SOURCE_DIR:UNINITIALIZED=C:/codes/esp32/kommando/firmware
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=C:/Espressif/tools/python/v6.0-beta2/venv/Scripts/python.exe
+PYTHON:UNINITIALIZED=python
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1

@@ -8,4 +8,37 @@ menu "Example Configuration"
             on embedded system. With this option enabled, gamma correction will be based on a look up table. Note that,
             the look up table provided in the example is only for a Gamma factor of 2.6.
 
+    menu "Kommando OTA Configuration"
+
+        config KOMMANDO_OTA_IMAGE_TYPE
+            hex "Zigbee OTA image type"
+            default 0x1011
+            range 0x0000 0xFFBF
+            help
+                Zigbee OTA image type exposed by the OTA client cluster.
+                Must match the image_type used when building .ota images.
+
+        config KOMMANDO_OTA_HW_VERSION
+            hex "Zigbee OTA hardware version"
+            default 0x0101
+            range 0x0000 0xFFFF
+            help
+                Hardware version reported by OTA client for optional server-side filtering.
+
+        config KOMMANDO_OTA_QUERY_INTERVAL_MIN
+            int "OTA query interval (minutes)"
+            default 60
+            range 1 1440
+            help
+                Periodic Query Next Image interval used after an OTA server is discovered.
+
+        config KOMMANDO_OTA_MAX_DATA_SIZE
+            int "OTA max data block size"
+            default 223
+            range 32 223
+            help
+                Maximum OTA block size requested by client. 223 is recommended by Espressif.
+
+    endmenu
+
 endmenu
