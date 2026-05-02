@@ -122,3 +122,179 @@ jobs:
             firmware/build/kommando.bin
             firmware/build/bootloader/bootloader.bin
             firmware/build/partition_table/partition-table.bin
+
+  auto-release-main:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: firmware-ci
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download latest flashable firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: kommando-firmware-main-${{ github.run_number }}
+          path: latest-main-artifacts
+
+      - name: Validate firmware binary for release
+        id: fw_check
+        run: |
+          BIN="latest-main-artifacts/kommando.bin"
+
+          if [ ! -f "$BIN" ]; then
+            echo "Missing firmware binary: $BIN" >&2
+            exit 1
+          fi
+
+          SIZE_BYTES=$(stat -c%s "$BIN")
+          if [ "$SIZE_BYTES" -le 1024 ]; then
+            echo "Firmware binary too small (${SIZE_BYTES} bytes)" >&2
+            exit 1
+          fi
+
+          MAGIC=$(xxd -p -l 1 "$BIN")
+          if [ "$MAGIC" != "e9" ]; then
+            echo "Unexpected ESP image magic byte: $MAGIC (expected e9)" >&2
+            exit 1
+          fi
+
+          SHA256=$(sha256sum "$BIN" | awk '{print $1}')
+
+          {
+            echo "size=${SIZE_BYTES}"
+            echo "sha256=${SHA256}"
+            echo "magic=${MAGIC}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Resolve previous release for comparison
+        id: prev_release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 30,
+            });
+
+            const previous = releases.find(r => !r.draft && !r.prerelease);
+            if (!previous) {
+              core.setOutput('tag', '');
+              core.setOutput('name', '');
+              core.setOutput('published_at', '');
+              core.setOutput('asset_size', '');
+              return;
+            }
+
+            const binAsset = (previous.assets || []).find(a => a.name === 'kommando.bin');
+
+            core.setOutput('tag', previous.tag_name || '');
+            core.setOutput('name', previous.name || '');
+            core.setOutput('published_at', previous.published_at || '');
+            core.setOutput('asset_size', binAsset ? String(binAsset.size) : '');
+
+      - name: Prepare auto-release metadata and bundle
+        id: release_meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG_NAME="main-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          RELEASE_NAME="Main Firmware Build #${GITHUB_RUN_NUMBER} (${SHORT_SHA})"
+
+          {
+            echo "tag=${TAG_NAME}"
+            echo "name=${RELEASE_NAME}"
+          } >> "$GITHUB_OUTPUT"
+
+          PREV_TAG="${{ steps.prev_release.outputs.tag }}"
+          PREV_SIZE="${{ steps.prev_release.outputs.asset_size }}"
+          CUR_SIZE="${{ steps.fw_check.outputs.size }}"
+
+          if [ -n "$PREV_SIZE" ]; then
+            SIZE_DIFF=$((CUR_SIZE - PREV_SIZE))
+          else
+            SIZE_DIFF=0
+          fi
+
+          if [ -n "$PREV_TAG" ] && git rev-parse "$PREV_TAG" >/dev/null 2>&1; then
+            CHANGE_LINES=$(git log --pretty=format:'- %s (%h)' "$PREV_TAG"..HEAD | head -n 25)
+            FILES_CHANGED=$(git diff --name-only "$PREV_TAG"..HEAD || true)
+          else
+            CHANGE_LINES=$(git log -n 15 --pretty=format:'- %s (%h)')
+            FILES_CHANGED=$(git diff-tree --no-commit-id --name-only -r HEAD || true)
+          fi
+
+          FW_COUNT=$(echo "$FILES_CHANGED" | grep -E '^firmware/main/|^firmware/CMakeLists.txt|^firmware/partition_table/' -c || true)
+          TOOLS_COUNT=$(echo "$FILES_CHANGED" | grep -E '^firmware/tools/' -c || true)
+          CI_COUNT=$(echo "$FILES_CHANGED" | grep -E '^\.github/workflows/' -c || true)
+          DOCS_COUNT=$(echo "$FILES_CHANGED" | grep -E '\.md$|^firmware/releases/' -c || true)
+
+          cat > release-body.md <<'EOF'
+          Automated release for the latest successful `main` build, intended for ESPHome Web Flasher/manual flash use.
+
+          ## Download
+          - `kommando.bin` (standalone firmware image)
+
+          ## Binary checks
+          - File size: __CUR_SIZE__ bytes
+          - SHA-256: `__CUR_SHA__`
+          - ESP image magic: `0x__CUR_MAGIC__` ✅
+
+          ## Comparison with previous release
+          - Previous release tag: __PREV_TAG__
+          - Previous `kommando.bin` size: __PREV_SIZE__ bytes
+          - Size delta: __SIZE_DIFF__ bytes
+
+          ## AI summary (heuristic)
+          - Firmware/core changes detected: __FW_COUNT__ file(s)
+          - Tooling changes detected: __TOOLS_COUNT__ file(s)
+          - CI/workflow changes detected: __CI_COUNT__ file(s)
+          - Documentation changes detected: __DOCS_COUNT__ file(s)
+
+          ### Key commits since previous release
+          __CHANGE_LINES__
+
+          > Additional auto-generated changelog notes are included by GitHub below.
+          EOF
+
+          sed -i "s#__CUR_SIZE__#${CUR_SIZE}#g" release-body.md
+          sed -i "s#__CUR_SHA__#${{ steps.fw_check.outputs.sha256 }}#g" release-body.md
+          sed -i "s#__CUR_MAGIC__#${{ steps.fw_check.outputs.magic }}#g" release-body.md
+          sed -i "s#__PREV_TAG__#${PREV_TAG:-none}#g" release-body.md
+          sed -i "s#__PREV_SIZE__#${PREV_SIZE:-n/a}#g" release-body.md
+          sed -i "s#__SIZE_DIFF__#${SIZE_DIFF}#g" release-body.md
+          sed -i "s#__FW_COUNT__#${FW_COUNT}#g" release-body.md
+          sed -i "s#__TOOLS_COUNT__#${TOOLS_COUNT}#g" release-body.md
+          sed -i "s#__CI_COUNT__#${CI_COUNT}#g" release-body.md
+          sed -i "s#__DOCS_COUNT__#${DOCS_COUNT}#g" release-body.md
+
+          if [ -z "$CHANGE_LINES" ]; then
+            CHANGE_LINES="- No commit delta available"
+          fi
+          awk -v lines="$CHANGE_LINES" '{gsub(/__CHANGE_LINES__/, lines)}1' release-body.md > release-body.tmp && mv release-body.tmp release-body.md
+
+          {
+            echo "## Firmware release checks"
+            echo "- Tag: ${TAG_NAME}"
+            echo "- SHA-256: ${{ steps.fw_check.outputs.sha256 }}"
+            echo "- Size: ${CUR_SIZE} bytes"
+            echo "- Previous tag: ${PREV_TAG:-none}"
+            echo "- Size delta: ${SIZE_DIFF} bytes"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish automatic main release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ steps.release_meta.outputs.name }}
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true
+          body_path: release-body.md
+          files: |
+            latest-main-artifacts/kommando.bin
