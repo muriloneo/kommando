@@ -40,7 +40,7 @@ jobs:
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0.0
+          esp_idf_version: v6.0
           target: esp32c6
           path: firmware
           command: idf.py build zigbee_ota_image
@@ -80,7 +80,7 @@ jobs:
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0.0
+          esp_idf_version: v6.0
           target: esp32c6
           path: firmware
           command: idf.py build zigbee_ota_image
