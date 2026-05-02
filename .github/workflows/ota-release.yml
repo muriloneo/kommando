@@ -34,13 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Clean build artifacts (remove stale CMakeCache)
-        run: rm -rf firmware/build/
+      - name: Clean build artifacts and managed components
+        run: rm -rf firmware/build/ firmware/managed_components/
 
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0-beta2
+          esp_idf_version: v6.0.0
           target: esp32c6
           path: firmware
           command: idf.py build zigbee_ota_image
@@ -74,13 +74,13 @@ jobs:
           fi
           echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Clean build artifacts (remove stale CMakeCache)
-        run: rm -rf firmware/build/
+      - name: Clean build artifacts and managed components
+        run: rm -rf firmware/build/ firmware/managed_components/
 
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
         with:
-          esp_idf_version: v6.0-beta2
+          esp_idf_version: v6.0.0
           target: esp32c6
           path: firmware
           command: idf.py build zigbee_ota_image
