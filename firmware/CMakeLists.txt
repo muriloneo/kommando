@@ -34,8 +34,13 @@ if(Python3_Interpreter_FOUND)
 
 	math(EXPR OTA_FILE_VERSION_NUM "(${_ver_major} << 24) | (${_ver_minor} << 16) | (${_ver_patch} << 8)")
 
+	set(IMAGE_BUILDER "${CMAKE_SOURCE_DIR}/tools/image_builder_tool.py")
+	if(NOT EXISTS "${IMAGE_BUILDER}")
+		message(FATAL_ERROR "Missing OTA image builder script: ${IMAGE_BUILDER}")
+	endif()
+
 	add_custom_target(zigbee_ota_image
-		COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/image_builder_tool.py
+		COMMAND ${Python3_EXECUTABLE} "${IMAGE_BUILDER}"
 			-c ${CMAKE_SOURCE_DIR}/releases/${CMAKE_PROJECT_NAME}_${PROJECT_VER}.ota
 			-v ${OTA_FILE_VERSION_NUM}
 			-m 0x1234

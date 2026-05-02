@@ -43,7 +43,7 @@ jobs:
           esp_idf_version: v6.0
           target: esp32c6
           path: firmware
-          command: idf.py build zigbee_ota_image
+          command: idf.py build
 
   build-and-release-ota:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
@@ -83,7 +83,7 @@ jobs:
           esp_idf_version: v6.0
           target: esp32c6
           path: firmware
-          command: idf.py build zigbee_ota_image
+          command: python -m pip install -r tools/requirements-ota.txt && idf.py build zigbee_ota_image
 
       - name: Install OTA packaging dependencies
         run: python -m pip install -r tools/requirements-ota.txt
