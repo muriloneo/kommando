@@ -34,6 +34,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean build artifacts (remove stale CMakeCache)
+        run: rm -rf firmware/build/
+
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
         with:
@@ -70,6 +73,9 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Clean build artifacts (remove stale CMakeCache)
+        run: rm -rf firmware/build/
 
       - name: Build firmware and OTA image (ESP-IDF)
         uses: espressif/esp-idf-ci-action@v1
