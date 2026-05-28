@@ -4,6 +4,7 @@ idf_component_register(
         "backlight.c"
         "tiles.c"
         "commands.c"
+        "commands_parse.c"
         "display.c"
         "ui_panel.c"
         "ui_state.c"
