@@ -17,6 +17,22 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
+/*
+ * Status LED driver.
+ *
+ * Purpose: visual feedback for Zigbee pairing / connection / error states,
+ * plus optional arbitrary RGB override (e.g. tile-driven color).
+ *
+ * Concurrency model: led_task is the SOLE owner of the LED hardware (RMT
+ * channel for WS2812, or plain GPIO fallback). All public setters only
+ * mutate state + raise a dirty flag; the task writes pixels on its next
+ * tick. This avoids cross-task RMT races that were observed previously.
+ *
+ * Power model: for static patterns (OFF / SOLID_ON / ERROR / RGB override)
+ * the task only re-emits pixels when state actually changed. Animated
+ * patterns (PAIRING / IDLE_BREATHING) re-emit every tick.
+ */
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -33,299 +49,226 @@
 
 static const char *TAG = "led";
 
-static bool s_rgb_override = false;
-static uint8_t s_rgb_r = 0;
-static uint8_t s_rgb_g = 0;
-static uint8_t s_rgb_b = 0;
+/* ---- Tunables ---------------------------------------------------------- */
 
-#define MIN_LED_TASK_DELAY_MS 20 // Always yield at least 20ms to avoid watchdog
+#define LED_TASK_TICK_MS        20     /* base tick; also feeds the watchdog */
+#define LED_TASK_IDLE_TICK_MS  100     /* when both WS2812 and GPIO disabled */
+#define LED_PAIRING_PERIOD_US  120000  /* 120 ms toggle */
+#define LED_BREATH_MIN           4
+#define LED_BREATH_MAX          64
+#define LED_BREATH_STEP          2
+#define LED_BRIGHTNESS_CAP      40     /* ~15%, prevents screen brownout */
 
-static bool s_led_enabled;
-static gpio_num_t s_led_gpio = GPIO_NUM_NC;
-static bool s_led_active_high;
-static bool s_led_ws2812;
-static led_pattern_t s_pattern = LED_PATTERN_OFF;
-static bool s_led_state_on;
-static int64_t s_last_toggle_us;
-static led_strip_handle_t s_led_strip;
+/* Pattern color presets (post brightness-cap is not applied here; these
+ * are already chosen safe values). */
+#define LED_SOLID_R 16
+#define LED_SOLID_G 64
+#define LED_SOLID_B 255
+#define LED_ERROR_R 64
+#define LED_PAIRING_LEVEL 64
 
-static esp_err_t led_ws2812_apply(bool on)
+/* ---- State (owned by led_task except where noted) ---------------------- */
+
+static gpio_num_t       s_gpio          = GPIO_NUM_NC;
+static bool             s_active_high   = true;
+static bool             s_ws2812        = false;
+static bool             s_enabled       = false;
+static led_strip_handle_t s_strip       = NULL;
+
+static led_pattern_t    s_pattern       = LED_PATTERN_OFF;
+static bool             s_rgb_override  = false;
+static uint8_t          s_rgb_r         = 0;
+static uint8_t          s_rgb_g         = 0;
+static uint8_t          s_rgb_b         = 0;
+static volatile bool    s_dirty         = true;   /* force first paint */
+
+static uint32_t         s_breath_speed_ms = 60;
+static int64_t          s_last_toggle_us  = 0;
+static bool             s_output_on       = false;
+
+/* ---- Helpers ----------------------------------------------------------- */
+
+static inline uint8_t cap(uint8_t v) { return v > LED_BRIGHTNESS_CAP ? LED_BRIGHTNESS_CAP : v; }
+
+static void write_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
-  const uint8_t red = on ? 16 : 0;
-  const uint8_t green = on ? 64 : 0;
-  const uint8_t blue = on ? 255 : 0;
-
-  ESP_RETURN_ON_ERROR(led_strip_set_pixel(s_led_strip, 0, red, green, blue), TAG, "WS2812 set pixel failed");
-  ESP_RETURN_ON_ERROR(led_strip_refresh(s_led_strip), TAG, "WS2812 refresh failed");
-  return ESP_OK;
-}
-
-static void led_apply_output(bool on)
-{
-  if (s_led_ws2812)
-  {
-    if (led_ws2812_apply(on) != ESP_OK)
-    {
-      ESP_LOGE(TAG, "WS2812 update failed, falling back to GPIO");
-      s_led_ws2812 = false;
-      // Try to configure GPIO output if not already done
-      gpio_config_t io_cfg = {
-          .pin_bit_mask = (1ULL << s_led_gpio),
-          .mode = GPIO_MODE_OUTPUT,
-          .pull_down_en = GPIO_PULLDOWN_DISABLE,
-          .pull_up_en = GPIO_PULLUP_DISABLE,
-          .intr_type = GPIO_INTR_DISABLE,
-      };
-      gpio_config(&io_cfg);
-      // Continue to GPIO below
-    }
-    else
-    {
-      s_led_state_on = on;
+  if (s_ws2812 && s_strip) {
+    if (led_strip_set_pixel(s_strip, 0, r, g, b) == ESP_OK) {
+      led_strip_refresh(s_strip);
+      s_output_on = (r || g || b);
       return;
     }
+    ESP_LOGE(TAG, "WS2812 write failed, falling back to GPIO");
+    s_ws2812 = false;
   }
-  // Always allow GPIO fallback
-  const int level = on ? (s_led_active_high ? 1 : 0) : (s_led_active_high ? 0 : 1);
-  gpio_set_level(s_led_gpio, level);
-  s_led_state_on = on;
+  if (s_gpio != GPIO_NUM_NC) {
+    const bool on = (r || g || b);
+    gpio_set_level(s_gpio, on ? (s_active_high ? 1 : 0) : (s_active_high ? 0 : 1));
+    s_output_on = on;
+  }
 }
 
 static void hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v,
                        uint8_t *r, uint8_t *g, uint8_t *b)
 {
-  uint8_t region = h / 43; // 256 / 6 ≈ 43
-  uint8_t remainder = (h - (region * 43)) * 6;
+  const uint8_t region    = h / 43;                 /* 256 / 6 ≈ 43 */
+  const uint8_t remainder = (h - (region * 43)) * 6;
+  const uint8_t p = (v * (255 - s)) >> 8;
+  const uint8_t q = (v * (255 - ((s * remainder) >> 8))) >> 8;
+  const uint8_t t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
 
-  uint8_t p = (v * (255 - s)) >> 8;
-  uint8_t q = (v * (255 - ((s * remainder) >> 8))) >> 8;
-  uint8_t t = (v * (255 - ((s * (255 - remainder)) >> 8))) >> 8;
-
-  switch (region)
-  {
-  case 0:
-    *r = v;
-    *g = t;
-    *b = p;
-    break;
-  case 1:
-    *r = q;
-    *g = v;
-    *b = p;
-    break;
-  case 2:
-    *r = p;
-    *g = v;
-    *b = t;
-    break;
-  case 3:
-    *r = p;
-    *g = q;
-    *b = v;
-    break;
-  case 4:
-    *r = t;
-    *g = p;
-    *b = v;
-    break;
-  default:
-    *r = v;
-    *g = p;
-    *b = q;
-    break;
+  switch (region) {
+    case 0:  *r = v; *g = t; *b = p; break;
+    case 1:  *r = q; *g = v; *b = p; break;
+    case 2:  *r = p; *g = v; *b = t; break;
+    case 3:  *r = p; *g = q; *b = v; break;
+    case 4:  *r = t; *g = p; *b = v; break;
+    default: *r = v; *g = p; *b = q; break;
   }
 }
 
-static int s_breath_speed_ms = 60; // Default breathing speed
+/* ---- Per-pattern step (returns true if pattern is animated this tick) -- */
 
-void led_set_breath_speed(int ms)
+static bool step_pattern(int64_t now_us)
 {
-  s_breath_speed_ms = ms;
+  /* RGB override wins over pattern. */
+  if (s_rgb_override) {
+    if (s_dirty) { write_rgb(s_rgb_r, s_rgb_g, s_rgb_b); s_dirty = false; }
+    return false;
+  }
+
+  switch (s_pattern) {
+    case LED_PATTERN_OFF:
+      if (s_dirty) { write_rgb(0, 0, 0); s_dirty = false; }
+      return false;
+
+    case LED_PATTERN_SOLID_ON:
+      if (s_dirty) { write_rgb(LED_SOLID_R, LED_SOLID_G, LED_SOLID_B); s_dirty = false; }
+      return false;
+
+    case LED_PATTERN_ERROR:
+      if (s_dirty) { write_rgb(LED_ERROR_R, 0, 0); s_dirty = false; }
+      return false;
+
+    case LED_PATTERN_PAIRING:
+      if ((now_us - s_last_toggle_us) >= LED_PAIRING_PERIOD_US) {
+        const uint8_t v = s_output_on ? 0 : LED_PAIRING_LEVEL;
+        write_rgb(v, v, v);
+        s_last_toggle_us = now_us;
+      }
+      return true;
+
+    case LED_PATTERN_IDLE_BREATHING: {
+      static uint8_t hue        = 0;
+      static uint8_t brightness = LED_BREATH_MIN;
+      static int8_t  direction  = 1;
+
+      brightness = (uint8_t)(brightness + direction * LED_BREATH_STEP);
+      if (brightness >= LED_BREATH_MAX) { brightness = LED_BREATH_MAX; direction = -1; }
+      else if (brightness <= LED_BREATH_MIN) { brightness = LED_BREATH_MIN; direction =  1; }
+      hue++;
+
+      uint8_t r, g, b;
+      hsv_to_rgb(hue, 255, brightness, &r, &g, &b);
+      write_rgb(r, g, b);
+      return true;
+    }
+
+    default:
+      return false;
+  }
 }
+
+/* ---- Task -------------------------------------------------------------- */
 
 static void led_task(void *arg)
 {
   (void)arg;
-
-  uint8_t breath_brightness = 0;
-  int breath_direction = 1;
-  const uint8_t breath_max = 64;
-  const uint8_t breath_min = 4;
-  const uint8_t breath_step = 2;
-  while (true)
-  {
+  while (true) {
+    if (!s_enabled && !s_ws2812) {
+      vTaskDelay(pdMS_TO_TICKS(LED_TASK_IDLE_TICK_MS));
+      continue;
+    }
     const int64_t now_us = esp_timer_get_time();
-    if (s_rgb_override && s_led_ws2812)
-    {
-      led_strip_set_pixel(s_led_strip, 0, s_rgb_r, s_rgb_g, s_rgb_b);
-      led_strip_refresh(s_led_strip);
-      vTaskDelay(pdMS_TO_TICKS(20));
-      continue;
-    }
-    if (!s_led_enabled && !s_led_ws2812)
-    {
-      // If both are disabled, just yield
-      vTaskDelay(pdMS_TO_TICKS(100));
-      continue;
-    }
-    switch (s_pattern)
-    {
-    case LED_PATTERN_ERROR:
-      if (s_led_ws2812)
-      {
-        led_strip_set_pixel(s_led_strip, 0, 64, 0, 0);
-        led_strip_refresh(s_led_strip);
-      }
-      else
-      {
-        led_apply_output(true);
-      }
-      break;
-    case LED_PATTERN_IDLE_BREATHING:
-      if (s_led_ws2812)
-      {
-        breath_brightness += breath_direction * breath_step;
-        if (breath_brightness >= breath_max)
-        {
-          breath_brightness = breath_max;
-          breath_direction = -1;
-        }
-        else if (breath_brightness <= breath_min)
-        {
-          breath_brightness = breath_min;
-          breath_direction = 1;
-        }
-        static uint8_t hue = 0;
-        hue++;
-        uint8_t r, g, b;
-        hsv_to_rgb(hue, 255, breath_brightness, &r, &g, &b);
-        led_strip_set_pixel(s_led_strip, 0, r, g, b);
-        led_strip_refresh(s_led_strip);
-      }
-      else
-      {
-        led_apply_output(true);
-      }
-      break;
-    case LED_PATTERN_PAIRING:
-      if ((now_us - s_last_toggle_us) >= 120000)
-      {
-        if (s_led_ws2812)
-        {
-          static bool pulse_on = false;
-          pulse_on = !pulse_on;
-          if (pulse_on)
-          {
-            led_strip_set_pixel(s_led_strip, 0, 64, 64, 64);
-          }
-          else
-          {
-            led_strip_set_pixel(s_led_strip, 0, 0, 0, 0);
-          }
-          led_strip_refresh(s_led_strip);
-        }
-        else
-        {
-          led_apply_output(!s_led_state_on);
-        }
-        s_last_toggle_us = now_us;
-      }
-      break;
-    case LED_PATTERN_OFF:
-      led_apply_output(false);
-      break;
-    case LED_PATTERN_SOLID_ON:
-      led_set_rgb(50, 50, 50);
-      led_apply_output(true);
-      break;
-    default:
-      break;
-    }
-    // Always yield at least MIN_LED_TASK_DELAY_MS
-    int delay_ms = s_breath_speed_ms < MIN_LED_TASK_DELAY_MS ? MIN_LED_TASK_DELAY_MS : s_breath_speed_ms;
+    const bool animated = step_pattern(now_us);
+
+    uint32_t delay_ms = animated ? s_breath_speed_ms : LED_TASK_TICK_MS;
+    if (delay_ms < LED_TASK_TICK_MS) delay_ms = LED_TASK_TICK_MS;
     vTaskDelay(pdMS_TO_TICKS(delay_ms));
   }
 }
 
+/* ---- Public API -------------------------------------------------------- */
+
 esp_err_t led_init(void)
 {
-  s_led_gpio = PIN_STATUS_LED;
-  s_led_active_high = true;  /* Active high for WS2812 */
-  s_led_enabled = true;
-  s_led_ws2812 = false;
-  s_led_strip = NULL;
-  s_led_state_on = false;
+  s_gpio           = PIN_STATUS_LED;
+  s_active_high    = true;
+  s_enabled        = true;
+  s_ws2812         = false;
+  s_strip          = NULL;
+  s_output_on      = false;
   s_last_toggle_us = esp_timer_get_time();
+  s_dirty          = true;
 
-  /* Initialize WS2812 RGB LED */
-  led_strip_config_t strip_cfg = {
-      .strip_gpio_num = s_led_gpio,
-      .max_leds = 1,
-  };
-  led_strip_rmt_config_t rmt_cfg = {
-      .resolution_hz = 10 * 1000 * 1000,
-  };
-  esp_err_t ws_err = led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &s_led_strip);
-  if (ws_err == ESP_OK)
-  {
-    s_led_ws2812 = true;
-    ESP_LOGI(TAG, "Status LED ready on WS2812 GPIO %d", (int)s_led_gpio);
-  }
-  else
-  {
-    ESP_LOGW(TAG, "WS2812 init failed (%s), falling back to GPIO mode", esp_err_to_name(ws_err));
-  }
-
-  if (!s_led_ws2812)
-  {
-    gpio_config_t io_cfg = {
-        .pin_bit_mask = (1ULL << s_led_gpio),
-        .mode = GPIO_MODE_OUTPUT,
+  const led_strip_config_t strip_cfg = { .strip_gpio_num = s_gpio, .max_leds = 1 };
+  const led_strip_rmt_config_t rmt_cfg = { .resolution_hz = 10 * 1000 * 1000 };
+  const esp_err_t ws_err = led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &s_strip);
+  if (ws_err == ESP_OK) {
+    s_ws2812 = true;
+    ESP_LOGI(TAG, "Status LED ready on WS2812 GPIO %d", (int)s_gpio);
+  } else {
+    ESP_LOGW(TAG, "WS2812 init failed (%s), falling back to GPIO", esp_err_to_name(ws_err));
+    const gpio_config_t io_cfg = {
+        .pin_bit_mask = (1ULL << s_gpio),
+        .mode         = GPIO_MODE_OUTPUT,
         .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .pull_up_en = GPIO_PULLUP_DISABLE,
-        .intr_type = GPIO_INTR_DISABLE,
+        .pull_up_en   = GPIO_PULLUP_DISABLE,
+        .intr_type    = GPIO_INTR_DISABLE,
     };
     ESP_RETURN_ON_ERROR(gpio_config(&io_cfg), TAG, "Failed to configure status LED GPIO");
-    ESP_LOGI(TAG, "Status LED ready on GPIO %d", (int)s_led_gpio);
+    ESP_LOGI(TAG, "Status LED ready on GPIO %d", (int)s_gpio);
   }
 
-  led_apply_output(false);
+  /* Paint OFF immediately so the LED is in a known state. */
+  write_rgb(0, 0, 0);
 
-  BaseType_t task_ok = xTaskCreate(led_task, "remote_led", 2048, NULL, 4, NULL);
+  const BaseType_t task_ok = xTaskCreate(led_task, "remote_led", 2048, NULL, 4, NULL);
   ESP_RETURN_ON_FALSE(task_ok == pdPASS, ESP_FAIL, TAG, "Failed to create LED task");
   return ESP_OK;
 }
 
 void led_set_pattern(led_pattern_t pattern)
 {
-  // Only update the pattern variable here. Do not perform hardware
-  // operations from caller tasks because those may run concurrently
-  // with the LED driver and can trigger RMT errors (channel not in
-  // init state). The led_task is the sole owner of the LED hardware
-  // and will apply the new pattern on its next loop iteration.
-  s_rgb_override = false; // ← ADD THIS
-  s_pattern = pattern;
+  /* Setters never touch hardware — only mutate state + flag dirty. */
+  s_rgb_override   = false;
+  s_pattern        = pattern;
   s_last_toggle_us = esp_timer_get_time();
+  s_dirty          = true;
+}
+
+void led_set_breath_speed(int ms)
+{
+  if (ms < 0) ms = 0;
+  s_breath_speed_ms = (uint32_t)ms;
 }
 
 bool led_is_available(void)
 {
-  return s_led_enabled;
+  return s_enabled;
 }
 
 void led_set_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
-    // Cap brightness to ~15% to prevent screen brownouts
-    r = r > 40 ? 40 : r;
-    g = g > 40 ? 40 : g;
-    b = b > 40 ? 40 : b;
-    
-    // Use the actual variable name (e.g. s_led_strip)
-    led_strip_set_pixel(s_led_strip, 0, r, g, b);
-    led_strip_refresh(s_led_strip);
+  s_rgb_r        = cap(r);
+  s_rgb_g        = cap(g);
+  s_rgb_b        = cap(b);
+  s_rgb_override = true;
+  s_dirty        = true;
 }
 
 void led_clear_rgb_override(void)
 {
   s_rgb_override = false;
+  s_dirty        = true;
 }
