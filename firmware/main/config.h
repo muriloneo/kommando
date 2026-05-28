@@ -25,6 +25,14 @@
 #include "driver/gpio.h"
 #include "driver/spi_common.h"
 
+/*
+ * Platform-independent UI constants (dimensions, colors, timing).
+ * Including this here makes them available to all ESP32 modules that
+ * include config.h, while also letting the simulator include ui_config.h
+ * directly without pulling in any ESP32 SDK headers.
+ */
+#include "ui_config.h"
+
 /* Fallbacks for environments where Kconfig symbols are not generated yet. */
 #ifndef CONFIG_KOMMANDO_OTA_IMAGE_TYPE
 #define CONFIG_KOMMANDO_OTA_IMAGE_TYPE 0x1011
@@ -92,10 +100,8 @@
 #define PIN_BUTTON       GPIO_NUM_9   /* Physical button (active low)             */
 
 /* ============================================================
-   DISPLAY CONFIGURATION
+   DISPLAY CONFIGURATION  (LCD_H_RES / LCD_V_RES live in ui_config.h)
    ============================================================ */
-#define LCD_H_RES              172              /* Horizontal resolution in pixels */
-#define LCD_V_RES              320              /* Vertical resolution in pixels   */
 #define LCD_DRAW_BUF_LINES     40              /* DMA draw buffer height           */
 #define LCD_SPI_HOST_ID        SPI2_HOST       /* SPI peripheral to use            */
 #define LCD_SPI_HOST           SPI2_HOST       /* Alias used by display.c           */
@@ -135,8 +141,7 @@
 #define ZB_STEERING_RETRY_MS         2000      /* Retry delay after steering failure  */
 #define ZB_LEAVE_RETRY_MS            3000      /* Retry delay after LEAVE signal      */
 #define ZB_REPORT_DELAY_MS           10        /* Delay before sending tile report    */
-#define TILE_LONG_PRESS_MS           300       /* Tile long-press opens dimmer        */
-#define DIMMER_IDLE_TIMEOUT_MS       3500      /* Auto-close dimmer after idle         */
+/* TILE_LONG_PRESS_MS and DIMMER_IDLE_TIMEOUT_MS are in ui_config.h */
 #define BUTTON_LONG_PRESS_MS         5000      /* Long press = re-pair               */
 #define BUTTON_FACTORY_RESET_MS      10000     /* Very long press = factory reset    */
 
@@ -189,35 +194,8 @@
 #define ZB_ATTR_DEEP_SLEEP_ID        0x0015   /* Alias for zigbee.c                    */
 #define ZB_ATTR_SLEEP_TIMEOUT_ID     0x0016   /* UINT16 — deep-sleep timeout (seconds) */
 
-/* ============================================================
-   UI LAYOUT
-   ============================================================ */
-#define MAX_TILES              6               /* 2 columns × 3 rows                */
-#define TILE_NAME_MAX_LEN      32              /* Max characters in tile name        */
-#define HEADER_HEIGHT_PX       28              /* Top bar height                     */
-#define TILE_CORNER_RADIUS     12              /* Rounded corner radius, pixels      */
-#define TILE_ICON_OFFSET_Y     (-10)           /* Icon vertical offset from center   */
-#define TILE_NAME_OFFSET_Y     14             /* Name vertical offset from center   */
-#define TILE_GRID_COLS         2
-#define TILE_GRID_ROWS         3
-
-/* ============================================================
-   UI COLORS  (0xRR, 0xGG, 0xBB byte triplets for lv_color_make)
-   ============================================================ */
-#define COLOR_BG_SCREEN         0x0B, 0x12, 0x1F   /* Deep navy background          */
-#define COLOR_BG                0x0B, 0x12, 0x1F   /* Alias for ui_panel.c          */
-#define COLOR_BG_HEADER         0x05, 0x0B, 0x15   /* Darker header bar             */
-#define COLOR_HEADER_BG         0x05, 0x0B, 0x15   /* Alias for ui_panel.c          */
-#define COLOR_HEADER_TEXT       0x90, 0xA0, 0xB0   /* Muted blue-grey text          */
-#define COLOR_TILE_UNCONFIGURED  0x1B, 0x25, 0x38   /* Very dark tile (unconfigured) */
-#define COLOR_TILE_EMPTY        0x1B, 0x25, 0x38   /* Alias for ui_panel.c          */
-#define COLOR_TILE_OFF          0x22, 0x2C, 0x42   /* Dark blue tile (OFF)          */
-#define COLOR_TILE_ON           0xFF, 0xCC, 0x00   /* Vivid yellow (ON)             */
-#define COLOR_TILE_ON_NIGHT     0x80, 0x66, 0x00   /* Dimmed gold in night mode     */
-#define COLOR_ICON_UNCONFIGURED  0x80, 0x90, 0xA0   /* Grey icon when unconfigured   */
-#define COLOR_TILE_UNCFG_TEXT   0x80, 0x90, 0xA0   /* Alias for ui_panel.c          */
-#define COLOR_STATE_TEXT        0xA0, 0xA0, 0xA0   /* Grey state label              */
-#define COLOR_STATE_LABEL       0xA0, 0xA0, 0xA0   /* Alias for ui_panel.c          */
+/* UI_LAYOUT, UI_COLORS, TILE_LONG_PRESS_MS, DIMMER_IDLE_TIMEOUT_MS are now
+   in ui_config.h (included at the top of this file). */
 
 /* ============================================================
    TASK SETTINGS

@@ -644,8 +644,8 @@ static esp_err_t zb_extract_ota_payload(uint32_t total_size,
             return ESP_ERR_INVALID_ARG;
         }
 
-        tag_id = *(const uint16_t *)payload;
-        element_len = *(const uint32_t *)(payload + sizeof(tag_id));
+        memcpy(&tag_id, payload, sizeof(tag_id));
+        memcpy(&element_len, payload + sizeof(tag_id), sizeof(element_len));
         if ((element_len + OTA_ELEMENT_HEADER_LEN) != total_size) {
             ESP_LOGW(TAG, "Invalid OTA element length [%lu/%lu]",
                      (unsigned long)element_len,
@@ -687,6 +687,8 @@ static esp_err_t zb_ota_upgrade_status_handler(esp_zb_zcl_ota_upgrade_value_mess
     case ESP_ZB_ZCL_OTA_UPGRADE_STATUS_START:
         ESP_LOGI(TAG, "-- OTA upgrade start");
         zb_ota_reset_state(false);
+        total_size = 0;
+        offset = 0;
         start_time_us = esp_timer_get_time();
         s_ota_partition = esp_ota_get_next_update_partition(NULL);
         if (!s_ota_partition) {
@@ -887,6 +889,10 @@ static esp_err_t zb_action_handler(esp_zb_core_action_callback_id_t cb_id, const
         /* ---- Command payload attr (0x0000) ---- */
         if (m->attribute.id == ZB_ATTR_PAYLOAD_ID) {
             uint8_t *data = (uint8_t *)m->attribute.data.value;
+            if (!data) {
+                ESP_LOGW(TAG, "SET_ATTR: NULL data pointer for payload attribute");
+                return ESP_ERR_INVALID_ARG;
+            }
             uint8_t  len  = data[0];
             if (len > 63) len = 63;
 

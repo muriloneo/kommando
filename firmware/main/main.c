@@ -25,6 +25,7 @@
 #include "commands.h"
 #include "display.h"
 #include "ui_panel.h"
+#include "ui_events.h"
 #include "zigbee.h"
 #include "led.h"
 #include "button.h"
@@ -40,6 +41,41 @@
 
 static const char *TAG = "main";
 
+/* ============================================================
+   ESP32 PLATFORM CALLBACK IMPLEMENTATIONS
+   ============================================================ */
+
+static bool impl_is_screen_active(void)       { return g_screen_active; }
+static bool impl_is_screen_hw_sleeping(void)  { return g_screen_hw_sleeping; }
+
+static int impl_get_backlight_pct(void)
+{
+    return (int)((g_backlight_level * 100) / 255);
+}
+
+static void impl_brightness_apply(uint8_t pct)
+{
+    g_backlight_level = (uint8_t)((pct * 255) / 100);
+    backlight_set(g_backlight_level);
+}
+
+static void impl_brightness_report(uint8_t pct)
+{
+    zb_report_backlight_level_async((uint8_t)((pct * 255) / 100));
+}
+
+static const ui_platform_cbs_t s_ui_cbs = {
+    .is_screen_active      = impl_is_screen_active,
+    .is_screen_hw_sleeping = impl_is_screen_hw_sleeping,
+    .on_screen_touch       = screen_wake,
+    .on_tile_tap           = tiles_on_tap,
+    .on_tile_hold          = tiles_on_hold,
+    .on_dim_change         = tile_slider_level_cb,
+    .get_backlight_pct     = impl_get_backlight_pct,
+    .on_brightness_apply   = impl_brightness_apply,
+    .on_brightness_report  = impl_brightness_report,
+};
+
 /* ---- LCD + UI Task ---- */
 
 /*
@@ -49,6 +85,9 @@ static const char *TAG = "main";
 static void lcd_task(void *arg)
 {
     lv_display_t *disp = display_init();
+
+    /* Bind platform callbacks before building the UI */
+    ui_panel_init(&s_ui_cbs);
 
     /* Build UI while holding the LVGL lock */
     vTaskDelay(pdMS_TO_TICKS(100));

@@ -6,6 +6,7 @@ idf_component_register(
         "commands.c"
         "display.c"
         "ui_panel.c"
+        "ui_state.c"
         "zigbee.c"
         "led.c"
         "button.c"

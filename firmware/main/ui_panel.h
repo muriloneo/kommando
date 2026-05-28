@@ -19,7 +19,17 @@
 #pragma once
 
 #include "lvgl.h"
+#include "ui_events.h"
 #include <stdbool.h>
+
+/**
+ * Bind platform callbacks before any other ui_panel_* call.
+ *
+ * @param cbs  Pointer to a statically-allocated ui_platform_cbs_t.
+ *             The struct must remain valid for the lifetime of the UI.
+ *             Pass NULL to clear (useful in unit tests).
+ */
+void ui_panel_init(const ui_platform_cbs_t *cbs);
 
 /**
  * Build the full panel UI on the currently active screen.

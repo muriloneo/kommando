@@ -19,6 +19,7 @@
 
 #include "commands.h"
 #include "tiles.h"
+#include "ui_state.h"
 #include "backlight.h"
 #include "ui_panel.h"
 #include "config.h"

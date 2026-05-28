@@ -15,13 +15,22 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * tiles.c — ESP32-specific tile dispatch layer.
+ *
+ * Owns the FreeRTOS event queue, per-tile debounce timers, and the Zigbee
+ * report task. Exposes platform callback implementations (tiles_on_tap,
+ * tiles_on_hold, tile_slider_level_cb, screen_wake) that are registered into
+ * the ui_platform_cbs_t struct in main.c.
+ *
+ * The tile state array (s_tiles[]) and ui_tile_t descriptor are in
+ * ui_state.c / ui_state.h — no platform dependencies there.
  */
 
 #include "tiles.h"
 #include "backlight.h"
 #include "config.h"
 #include "display.h"
-#include "ui_panel.h"
 #include "zigbee.h"
 
 #include "esp_log.h"
@@ -36,14 +45,13 @@ void zb_send_tile_state(uint8_t param);
 
 static const char *TAG = "tiles";
 
-/* ---- Globals (declared extern in tiles.h) ---- */
-ui_tile_t     s_tiles[MAX_TILES];
-QueueHandle_t s_tile_event_queue = NULL;
-zb_tile_evt_t s_zb_evt_buf[ZB_EVT_RING_SIZE];
-int           s_zb_evt_index = 0;
+/* ---- FreeRTOS state (declared extern in tiles.h) ---- */
+QueueHandle_t        s_tile_event_queue = NULL;
+zb_tile_evt_t        s_zb_evt_buf[ZB_EVT_RING_SIZE];
+int                  s_zb_evt_index = 0;
 
 /* ---- Screen inactivity state (shared with display.c) ---- */
-volatile TickType_t s_last_touch_tick = 0;
+volatile TickType_t  s_last_touch_tick = 0;
 
 static void enqueue_tile_event(const tile_event_t *evt)
 {
@@ -80,29 +88,21 @@ static void dim_debounce_cb(TimerHandle_t timer)
 
 void tiles_init(void)
 {
-    s_tile_event_queue = xQueueCreate(TILE_EVENT_QUEUE_SIZE, sizeof(tile_event_t));
-    configASSERT(s_tile_event_queue);
-
+    /* s_tiles[] is zero-initialised by the C runtime (defined in ui_state.c).
+     * Set the id field and name for each slot. */
     for (int i = 0; i < MAX_TILES; i++) {
-        s_tiles[i].id                  = i;
-        s_tiles[i].state               = false;
-        s_tiles[i].configured          = false;
-        s_tiles[i].dimmable            = false;
-        s_tiles[i].level               = 0;
-        s_tiles[i].suppress_next_click = false;
-        s_tiles[i].tile                = NULL;
-        s_tiles[i].icon_label          = NULL;
-        s_tiles[i].name_label          = NULL;
-        s_tiles[i].state_label         = NULL;
-        s_tiles[i].dimmer_badge        = NULL;
+        s_tiles[i].id = i;
         snprintf(s_tiles[i].name, sizeof(s_tiles[i].name), "Tile_%d", i);
     }
 
+    s_tile_event_queue = xQueueCreate(TILE_EVENT_QUEUE_SIZE, sizeof(tile_event_t));
+    configASSERT(s_tile_event_queue);
+
     s_last_touch_tick = xTaskGetTickCount();
 
-    ESP_LOGI(TAG, "Tile array and event queue ready (%d tiles)", MAX_TILES);
+    ESP_LOGI(TAG, "Event queue ready (%d tiles)", MAX_TILES);
 
-    /* Create per-tile debounce timers for DIM slider */
+    /* Create per-tile debounce timers for the DIM slider */
     for (int i = 0; i < MAX_TILES; i++) {
         s_dim_pending[i] = false;
         s_dim_timers[i] = xTimerCreate(
@@ -110,6 +110,7 @@ void tiles_init(void)
             pdFALSE,  /* one-shot */
             (void *)(uintptr_t)i,
             dim_debounce_cb);
+        configASSERT(s_dim_timers[i]);
     }
 }
 
@@ -126,108 +127,53 @@ void screen_wake(void)
 }
 
 /* ---- LVGL touch callback ---- */
-void tile_event_cb(lv_event_t *e)
+/* ============================================================
+   PLATFORM CALLBACK IMPLEMENTATIONS (registered via ui_platform_cbs_t)
+   ============================================================ */
+
+void tiles_on_tap(int tile_id, bool new_state)
 {
-    ui_tile_t *t = (ui_tile_t *)lv_event_get_user_data(e);
-    if (!t) {
-        ESP_LOGW(TAG, "tile_event_cb: NULL user data");
-        return;
-    }
-
-    lv_event_code_t code = lv_event_get_code(e);
-    if (code != LV_EVENT_CLICKED && code != LV_EVENT_LONG_PRESSED) {
-        return;
-    }
-
-    /* Capture screen state BEFORE calling screen_wake (which may modify it) */
-    bool was_active = g_screen_active;
-    bool was_hw_sleeping = g_screen_hw_sleeping;
-
-    /* Reset the inactivity timer so the screen stays on / wakes up */
-    screen_wake();
-
-    /*
-     * Wake behavior:
-     * - From DIMMED: first click only wakes (no toggle), prevents accidental toggles.
-     * - From SCREEN_SLEEP: allow the first click to both wake and toggle.
-     */
-    if (!was_active && !was_hw_sleeping && code != LV_EVENT_LONG_PRESSED) {
-        ESP_LOGI(TAG, "Wake tap — tile action suppressed");
-        return;
-    }
-
-    if (code == LV_EVENT_LONG_PRESSED) {
-        if (!t->dimmable) {
-            ESP_LOGI(TAG, "Tile[%d] hold ignored: tile is not dimmable", t->id);
-            return;
-        }
-
-        t->suppress_next_click = true;
-        ui_panel_show_dimmer(t->id, t->name, t->level);
-
-        tile_event_t evt = {
-            .id = t->id,
-            .type = TILE_EVT_HOLD,
-            .state = t->state,
-            .value = t->level,
-        };
-        enqueue_tile_event(&evt);
-        ESP_LOGI(TAG, "Tile[%d] hold → open dimmer (level=%u)", t->id, t->level);
-        return;
-    }
-
-    /* Click path */
-    if (t->suppress_next_click) {
-        t->suppress_next_click = false;
-        ESP_LOGD(TAG, "Tile[%d] click suppressed after long press", t->id);
-        return;
-    }
-
-    bool old_state = t->state;
-    t->state = !t->state;
-
-    /* Update LVGL visuals immediately (we're inside an LVGL event, lock held) */
-    if (t->tile) {
-        lv_color_t on_color = ui_panel_get_on_color();
-        lv_obj_set_style_bg_color(t->tile,
-            t->state ? on_color : lv_color_make(COLOR_TILE_OFF),
-            LV_PART_MAIN);
-    }
-
-    ESP_LOGI(TAG, "Tile[%d] '%s' %s → %s",
-             t->id,
-             t->configured ? t->name : "(unconfigured)",
-             old_state ? "ON" : "OFF",
-             t->state  ? "ON" : "OFF");
-
     tile_event_t evt = {
-        .id = t->id,
-        .type = TILE_EVT_TAP,
-        .state = t->state,
-        .value = t->level,
+        .id    = tile_id,
+        .type  = TILE_EVT_TAP,
+        .state = new_state,
+        .value = s_tiles[tile_id].level,
     };
     enqueue_tile_event(&evt);
+}
+
+void tiles_on_hold(int tile_id, uint8_t current_level)
+{
+    tile_event_t evt = {
+        .id    = tile_id,
+        .type  = TILE_EVT_HOLD,
+        .state = s_tiles[tile_id].state,
+        .value = current_level,
+    };
+    enqueue_tile_event(&evt);
+    ESP_LOGI(TAG, "Tile[%d] hold enqueued (level=%u)", tile_id, current_level);
 }
 
 void tile_slider_level_cb(int tile_id, uint8_t level)
 {
     if (tile_id < 0 || tile_id >= MAX_TILES) return;
     if (!s_tiles[tile_id].dimmable) {
-        ESP_LOGI(TAG, "Tile[%d] dim update ignored: tile is not dimmable", tile_id);
+        ESP_LOGI(TAG, "Tile[%d] dim update ignored: not dimmable", tile_id);
         return;
     }
 
-    s_tiles[tile_id].level = level;
+    s_tiles[tile_id].level    = level;
     s_dim_pending_level[tile_id] = level;
-    s_dim_pending[tile_id] = true;
+    s_dim_pending[tile_id]    = true;
 
-    /* Reset the debounce timer — only fires after DIM_DEBOUNCE_MS of inactivity */
+    /* Reset debounce timer — fires after DIM_DEBOUNCE_MS of inactivity */
     xTimerReset(s_dim_timers[tile_id], 0);
 }
 
 /* ---- Tile report task ---- */
 void tile_report_task(void *arg)
 {
+    (void)arg;
     tile_event_t evt;
     while (1) {
         if (xQueueReceive(s_tile_event_queue, &evt, portMAX_DELAY) != pdTRUE) {
@@ -242,14 +188,14 @@ void tile_report_task(void *arg)
             ESP_LOGI(TAG, "Reporting DIM Tile[%d] -> %u", evt.id, evt.value);
         }
 
-        int idx = s_zb_evt_index++ % ZB_EVT_RING_SIZE;
+        int idx = s_zb_evt_index;
+        s_zb_evt_index = (s_zb_evt_index + 1) % ZB_EVT_RING_SIZE;
         s_zb_evt_buf[idx].id    = evt.id;
         s_zb_evt_buf[idx].type  = evt.type;
         s_zb_evt_buf[idx].state = evt.state;
         s_zb_evt_buf[idx].value = evt.value;
 
-        /* Schedule send in Zigbee task context after a short guard delay.
-         * Must hold the Zigbee lock — we're in a different FreeRTOS task. */
+        /* Schedule send in Zigbee task context after a short guard delay */
         esp_zb_lock_acquire(portMAX_DELAY);
         esp_zb_scheduler_alarm(zb_send_tile_state, (uint8_t)idx, ZB_REPORT_DELAY_MS);
         esp_zb_lock_release();

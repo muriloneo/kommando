@@ -15,6 +15,11 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * tiles.h — ESP32-specific tile event dispatch and FreeRTOS infrastructure.
+ *
+ * The tile state struct (ui_tile_t) and shared array (s_tiles[]) live in
+ * ui_state.h / ui_state.c so they can be included without RTOS headers.
  */
 
 #pragma once
@@ -24,40 +29,24 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "lvgl.h"
 #include "config.h"
+#include "ui_state.h"   /* ui_tile_t, s_tiles[] */
 
-/* ---- Tile descriptor ---- */
-typedef struct {
-    int        id;                        /* 0–5                                  */
-    lv_obj_t  *tile;                      /* LVGL container object                */
-    lv_obj_t  *icon_label;                /* LVGL label — icon glyph              */
-    lv_obj_t  *name_label;                /* LVGL label — friendly name           */
-    lv_obj_t  *state_label;               /* LVGL label — "ON" / "OFF" / ""       */
-    lv_obj_t  *dimmer_badge;              /* LVGL dimmer indicator (small dot)     */
-    bool       state;                     /* Current logical ON/OFF state          */
-    bool       configured;                /* True once HA has sent a C: command    */
-    bool       dimmable;                  /* True if HA says this tile supports dimming */
-    uint8_t    level;                     /* 0..100 dim level                      */
-    bool       suppress_next_click;       /* Prevent click after long press        */
-    char       name[TILE_NAME_MAX_LEN];   /* Friendly name string                  */
-} ui_tile_t;
-
+/* ---- Internal event types for the touch→Zigbee queue ---- */
 typedef enum {
     TILE_EVT_TAP = 0,
     TILE_EVT_HOLD,
     TILE_EVT_DIM,
 } tile_evt_type_t;
 
-/* ---- Event passed through the touch→Zigbee queue ---- */
 typedef struct {
     int             id;
     tile_evt_type_t type;
     bool            state;   /* used by TAP */
-    uint8_t         value;   /* used by DIM, and current level for HOLD */
+    uint8_t         value;   /* used by DIM and HOLD */
 } tile_event_t;
 
-/* ---- Event buffer entry for esp_zb_scheduler_alarm() callbacks ---- */
+/* ---- Event buffer for esp_zb_scheduler_alarm() callbacks ---- */
 typedef struct {
     int             id;
     tile_evt_type_t type;
@@ -65,55 +54,38 @@ typedef struct {
     uint8_t         value;
 } zb_tile_evt_t;
 
-/* Global tile array — read by commands.c and ui_panel.c */
-extern ui_tile_t       s_tiles[MAX_TILES];
-extern QueueHandle_t   s_tile_event_queue;
+extern QueueHandle_t         s_tile_event_queue;
+extern volatile TickType_t   s_last_touch_tick;
+extern zb_tile_evt_t         s_zb_evt_buf[ZB_EVT_RING_SIZE];
+extern int                   s_zb_evt_index;
 
-/* Inactivity timestamp — updated by tile_event_cb(), read by display.c */
-extern volatile TickType_t s_last_touch_tick;
-
-/* Ring buffer used by Zigbee report scheduling */
-extern zb_tile_evt_t   s_zb_evt_buf[ZB_EVT_RING_SIZE];
-extern int             s_zb_evt_index;
-
-/*
- * tiles_init — Initialise the tile array and create the event queue.
- * Must be called from app_main() before any task is started.
+/**
+ * tiles_init — Create the FreeRTOS event queue and per-tile debounce timers.
+ * Call from app_main() before starting any tasks.
  */
 void tiles_init(void);
 
-/*
- * tile_event_cb — LVGL event callback; register on each tile with
- * lv_obj_add_event_cb(tile, tile_event_cb, LV_EVENT_CLICKED, &s_tiles[i]).
- * Toggles tile state and enqueues a tile_event_t.
- */
-void tile_event_cb(lv_event_t *e);
-
-/*
- * screen_wake — reset inactivity timer to keep screen active.
+/**
+ * screen_wake — Reset the inactivity timestamp and restore backlight.
+ * Registered as the on_screen_touch platform callback.
  */
 void screen_wake(void);
 
-/*
- * ui_panel_update_dimmer_badge — Show/hide dimmer indicator on tile.
- * Called when tile.dimmable state changes (from HA D: command).
+/**
+ * tiles_on_tap / tiles_on_hold — ui_platform_cbs_t implementations.
+ * Enqueue the appropriate tile_event_t onto the FreeRTOS queue.
  */
-void ui_panel_update_dimmer_badge(int tile_id, bool dimmable);
+void tiles_on_tap(int tile_id, bool new_state);
+void tiles_on_hold(int tile_id, uint8_t current_level);
 
-/*
- * tile_report_task — FreeRTOS task body.
- * Dequeues tile_event_t items and schedules zb_send_tile_state() via the
- * Zigbee scheduler alarm so the send runs in the Zigbee task context.
- */
-void tile_report_task(void *arg);
-
-/*
- * Called by UI slider overlay when user changes dim value.
+/**
+ * tile_slider_level_cb — on_dim_change platform callback implementation.
+ * Updates per-tile level and resets the debounce timer.
  */
 void tile_slider_level_cb(int tile_id, uint8_t level);
 
-/*
- * screen_wake — Reset the inactivity timer and restore backlight.
- * Called by tile_event_cb() and by the button driver on any press.
+/**
+ * tile_report_task — FreeRTOS task body.
+ * Drains the event queue and schedules Zigbee reports via the scheduler alarm.
  */
-void screen_wake(void);
+void tile_report_task(void *arg);
