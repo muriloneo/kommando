@@ -15,38 +15,81 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ *
+ * ui_panel.c — Pure LVGL UI layer.
+ *
+ * NO platform dependencies (no ESP32 SDK, no FreeRTOS, no Zigbee).
+ * All interactions with the outside world go through the ui_platform_cbs_t
+ * registered via ui_panel_init(). This makes the file compilable and
+ * testable on any desktop host with an LVGL SDL2 backend (see simulator/).
  */
 
 #include "ui_panel.h"
-#include "tiles.h"    /* s_tiles[], tile_event_cb()                     */
-#include "config.h"
-#include "zigbee.h"
-#include "backlight.h"
-#include "display.h"  /* g_screen_active                                */
-
-#include "esp_log.h"
+#include "ui_config.h"    /* dimensions, colors, timing constants     */
+#include "ui_events.h"    /* ui_platform_cbs_t                        */
+#include "ui_state.h"     /* s_tiles[], ui_tile_t                     */
 #include "lvgl.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/timers.h"
-
-static lv_obj_t *s_dimmer_overlay = NULL;
-static lv_obj_t *s_dimmer_title   = NULL;
-static lv_obj_t *s_dimmer_value   = NULL;
-static lv_obj_t *s_dimmer_slider  = NULL;
-static lv_obj_t *s_conn_overlay   = NULL;
-static lv_obj_t *s_conn_label     = NULL;
-static lv_obj_t *s_conn_spinner   = NULL;
-static int       s_dimmer_tile_id = -1;
-static bool      s_dimmer_is_panel = false;
-static lv_timer_t *s_dimmer_idle_timer = NULL;
-static uint32_t  s_dimmer_last_activity = 0;
-static TimerHandle_t s_panel_bl_report_timer = NULL;
-static uint8_t    s_panel_bl_pending = BL_LEVEL_DEFAULT;
+#include <stdio.h>        /* snprintf */
 
 static const char *TAG = "ui_panel";
 
-/* Current night-mode flag — kept here so ui_panel_get_on_color is accurate */
+/* ============================================================
+   PLATFORM CALLBACKS
+   ============================================================ */
+
+static const ui_platform_cbs_t *s_cbs = NULL;
+
+void ui_panel_init(const ui_platform_cbs_t *cbs)
+{
+    s_cbs = cbs;
+
+    /* LVGL 9 removed per-object long-press timing. Apply globally to all
+     * registered input devices so every tile/dimmer trigger uses
+     * TILE_LONG_PRESS_MS (dimming modal long-press behavior). */
+    lv_indev_t *indev = lv_indev_get_next(NULL);
+    while (indev != NULL) {
+        lv_indev_set_long_press_time(indev, TILE_LONG_PRESS_MS);
+        indev = lv_indev_get_next(indev);
+    }
+}
+
+static inline bool screen_is_active(void)
+{
+    return s_cbs && s_cbs->is_screen_active ? s_cbs->is_screen_active() : true;
+}
+
+static inline bool screen_is_hw_sleeping(void)
+{
+    return s_cbs && s_cbs->is_screen_hw_sleeping ? s_cbs->is_screen_hw_sleeping() : false;
+}
+
+static inline void notify_screen_touch(void)
+{
+    if (s_cbs && s_cbs->on_screen_touch) s_cbs->on_screen_touch();
+}
+
+/* ============================================================
+   WIDGET HANDLES
+   ============================================================ */
+
+static lv_obj_t *s_dimmer_overlay  = NULL;
+static lv_obj_t *s_dimmer_title    = NULL;
+static lv_obj_t *s_dimmer_value    = NULL;
+static lv_obj_t *s_dimmer_slider   = NULL;
+static lv_obj_t *s_conn_overlay    = NULL;
+static lv_obj_t *s_conn_label      = NULL;
+static lv_obj_t *s_conn_spinner    = NULL;
+static int       s_dimmer_tile_id  = -1;
+static bool      s_dimmer_is_panel = false;
+
 static bool s_night_mode = false;
+
+/* ============================================================
+   DIMMER IDLE TIMER  (pure LVGL — no FreeRTOS needed)
+   ============================================================ */
+
+static lv_timer_t *s_dimmer_idle_timer    = NULL;
+static uint32_t    s_dimmer_last_activity = 0;
 
 static void dimmer_idle_timer_cb(lv_timer_t *t)
 {
@@ -62,18 +105,97 @@ static void dimmer_idle_timer_cb(lv_timer_t *t)
 
 static void dimmer_touch_activity(void)
 {
-    screen_wake();
+    notify_screen_touch();
     s_dimmer_last_activity = lv_tick_get();
     if (!s_dimmer_idle_timer) {
         s_dimmer_idle_timer = lv_timer_create(dimmer_idle_timer_cb, 500, NULL);
     }
 }
 
-static void panel_backlight_report_timer_cb(TimerHandle_t t)
+/* ============================================================
+   BRIGHTNESS REPORT DEBOUNCE TIMER  (LVGL replaces FreeRTOS timer)
+   ============================================================ */
+
+static lv_timer_t *s_bl_report_timer = NULL;
+static uint8_t     s_bl_pending_pct  = 100;
+
+static void bl_report_timer_cb(lv_timer_t *t)
 {
-    (void)t;
-    zb_report_backlight_level_async(s_panel_bl_pending);
+    lv_timer_delete(t);
+    s_bl_report_timer = NULL;
+    if (s_cbs && s_cbs->on_brightness_report) {
+        s_cbs->on_brightness_report(s_bl_pending_pct);
+    }
 }
+
+/* ============================================================
+   TILE EVENT CALLBACK  (moved from tiles.c — pure LVGL + callbacks)
+   ============================================================ */
+
+static void tile_event_cb(lv_event_t *e)
+{
+    ui_tile_t *t = (ui_tile_t *)lv_event_get_user_data(e);
+    if (!t) return;
+
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code != LV_EVENT_CLICKED && code != LV_EVENT_LONG_PRESSED) return;
+
+    /* Capture screen state BEFORE waking — the wake call may change it */
+    bool was_active      = screen_is_active();
+    bool was_hw_sleeping = screen_is_hw_sleeping();
+
+    notify_screen_touch();
+
+    /*
+     * Wake behaviour:
+     * - From DIMMED:       first touch only wakes; does NOT toggle.
+     * - From SCREEN_SLEEP: allow the touch to both wake AND toggle.
+     */
+    if (!was_active && !was_hw_sleeping && code != LV_EVENT_LONG_PRESSED) {
+        UI_LOGI(TAG, "Wake tap — tile action suppressed");
+        return;
+    }
+
+    if (code == LV_EVENT_LONG_PRESSED) {
+        if (!t->dimmable) {
+            UI_LOGI(TAG, "Tile[%d] hold ignored: not dimmable", t->id);
+            return;
+        }
+        t->suppress_next_click = true;
+        ui_panel_show_dimmer(t->id, t->name, t->level);
+        if (s_cbs && s_cbs->on_tile_hold) s_cbs->on_tile_hold(t->id, t->level);
+        UI_LOGI(TAG, "Tile[%d] hold → open dimmer (level=%u)", t->id, t->level);
+        return;
+    }
+
+    /* Click path */
+    if (t->suppress_next_click) {
+        t->suppress_next_click = false;
+        UI_LOGD(TAG, "Tile[%d] click suppressed after long press", t->id);
+        return;
+    }
+
+    bool old_state = t->state;
+    t->state = !t->state;
+
+    if (t->tile) {
+        lv_obj_set_style_bg_color(t->tile,
+            t->state ? ui_panel_get_on_color() : lv_color_make(COLOR_TILE_OFF),
+            LV_PART_MAIN);
+    }
+
+    UI_LOGI(TAG, "Tile[%d] '%s' %s → %s",
+             t->id,
+             t->configured ? t->name : "(unconfigured)",
+             old_state ? "ON" : "OFF",
+             t->state  ? "ON" : "OFF");
+
+    if (s_cbs && s_cbs->on_tile_tap) s_cbs->on_tile_tap(t->id, t->state);
+}
+
+/* ============================================================
+   OTHER EVENT CALLBACKS
+   ============================================================ */
 
 static void dimmer_slider_event_cb(lv_event_t *e)
 {
@@ -87,32 +209,24 @@ static void dimmer_slider_event_cb(lv_event_t *e)
     dimmer_touch_activity();
 
     if (s_dimmer_is_panel) {
-        /* Map 0..100% -> 0..255 backlight */
-        uint8_t bl = (uint8_t)((value * 255) / 100);
-
-        /* Apply locally immediately for smooth UI feedback */
-        g_backlight_level = bl;
-        backlight_set(bl);
-
-        /* Debounce Zigbee reporting to avoid flooding APS queue */
-        s_panel_bl_pending = bl;
-        if (!s_panel_bl_report_timer) {
-            s_panel_bl_report_timer = xTimerCreate(
-                "panel_bl_rep",
-                pdMS_TO_TICKS(150),
-                pdFALSE, /* one-shot */
-                NULL,
-                panel_backlight_report_timer_cb);
-            if (!s_panel_bl_report_timer) {
-                ESP_LOGW(TAG, "Failed to create panel backlight debounce timer");
-                return;
-            }
+        /* Apply hardware brightness immediately for smooth feedback */
+        s_bl_pending_pct = (uint8_t)value;
+        if (s_cbs && s_cbs->on_brightness_apply) {
+            s_cbs->on_brightness_apply(s_bl_pending_pct);
         }
 
-        xTimerChangePeriod(s_panel_bl_report_timer, pdMS_TO_TICKS(150), 0);
-        xTimerReset(s_panel_bl_report_timer, 0);
+        /* Debounce network report with a 150 ms LVGL timer */
+        if (s_bl_report_timer) {
+            lv_timer_reset(s_bl_report_timer);
+        } else {
+            s_bl_report_timer = lv_timer_create(bl_report_timer_cb, 150, NULL);
+            lv_timer_set_repeat_count(s_bl_report_timer, 1);
+        }
     } else {
-        tile_slider_level_cb(s_dimmer_tile_id, (uint8_t)value);
+        /* Tile dimmer — forward to platform immediately */
+        if (s_cbs && s_cbs->on_dim_change) {
+            s_cbs->on_dim_change(s_dimmer_tile_id, (uint8_t)value);
+        }
     }
 }
 
@@ -125,23 +239,22 @@ static void dimmer_overlay_click_cb(lv_event_t *e)
 static void header_click_cb(lv_event_t *e)
 {
     (void)e;
-    
-    /* Capture screen state before wake */
-    bool was_active = g_screen_active;
-    screen_wake();
-    
-    /* If waking from sleep/dim, suppress the brightness control action */
-    if (!was_active) {
-        return;
-    }
-    
-    /* Open panel brightness control */
-    int level_pct = (int)((g_backlight_level * 100) / 255);
-    if (level_pct < 0) level_pct = 0;
+
+    bool was_active = screen_is_active();
+    notify_screen_touch();
+
+    /* If waking from sleep/dim, suppress the brightness panel open */
+    if (!was_active) return;
+
+    /* Query current brightness via platform callback (0–100%) */
+    int level_pct = s_cbs && s_cbs->get_backlight_pct
+                    ? s_cbs->get_backlight_pct()
+                    : 100;
+    if (level_pct < 0)   level_pct = 0;
     if (level_pct > 100) level_pct = 100;
 
     s_dimmer_is_panel = true;
-    s_dimmer_tile_id = 0; /* dummy, unused in panel mode */
+    s_dimmer_tile_id  = 0;   /* unused in panel mode */
     lv_slider_set_range(s_dimmer_slider, 0, 100);
     lv_slider_set_value(s_dimmer_slider, level_pct, LV_ANIM_OFF);
 
@@ -158,7 +271,7 @@ static void global_touch_cb(lv_event_t *e)
 {
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_PRESSED || code == LV_EVENT_PRESSING || code == LV_EVENT_CLICKED) {
-        screen_wake();
+        notify_screen_touch();
     }
 }
 
@@ -177,10 +290,6 @@ void ui_panel_set_night_mode(bool night_on)
 {
     s_night_mode = night_on;
 
-    /*
-     * Repaint all tiles that are currently ON so the colour change
-     * is immediately visible without waiting for the next state update.
-     */
     lv_color_t on_color = ui_panel_get_on_color();
     for (int i = 0; i < MAX_TILES; i++) {
         if (s_tiles[i].tile && s_tiles[i].state) {
@@ -252,7 +361,8 @@ void ui_panel_update_dimmer_badge(int tile_id, bool dimmable)
 
 void ui_panel_build(lv_display_t *disp)
 {
-    ESP_LOGI(TAG, "Building panel UI...");
+    (void)disp;   /* Reserved for multi-display use */
+    UI_LOGI(TAG, "Building panel UI...");
 
     lv_obj_t *scr = lv_screen_active();
 
@@ -321,64 +431,64 @@ void ui_panel_build(lv_display_t *disp)
         lv_obj_set_style_text_color(icon, lv_color_make(COLOR_TILE_UNCFG_TEXT), LV_PART_MAIN);
         lv_obj_align(icon, LV_ALIGN_CENTER, 0, TILE_ICON_OFFSET_Y);
 
-        /* Name — single-line, centered below icon (truncate long names) */
+        /* Name — single-line, centred below icon, truncated on overflow */
         lv_obj_t *name = lv_label_create(tile);
         lv_label_set_text(name, "Empty");
         lv_obj_set_style_text_font(name, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_set_style_text_color(name, lv_color_white(), LV_PART_MAIN);
         lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
         lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(name, (LCD_H_RES / 2) - 20);
+        lv_obj_set_width(name, (LCD_H_RES / TILE_GRID_COLS) - 20);
         lv_obj_align(name, LV_ALIGN_CENTER, 0, TILE_NAME_OFFSET_Y);
 
-        /* State label — hidden (avoid overlaying names) */
+        /* State label — hidden by default */
         lv_obj_t *state = lv_label_create(tile);
         lv_label_set_text(state, "");
         lv_obj_set_style_text_font(state, &lv_font_montserrat_14, LV_PART_MAIN);
         lv_obj_set_style_text_color(state, lv_color_make(COLOR_STATE_LABEL), LV_PART_MAIN);
         lv_obj_add_flag(state, LV_OBJ_FLAG_HIDDEN);
 
-        /* Dimmer badge — small indicator at top-right when dimmable */
+        /* Dimmer badge — small orange dot at top-right */
         lv_obj_t *badge = lv_obj_create(tile);
-        lv_obj_set_size(badge, 10, 10);
+        lv_obj_set_size(badge, UI_BADGE_SIZE, UI_BADGE_SIZE);
         lv_obj_align(badge, LV_ALIGN_TOP_RIGHT, -4, 4);
-        lv_obj_set_style_radius(badge, 6, LV_PART_MAIN);        /* Circular */
+        lv_obj_set_style_radius(badge, UI_BADGE_RADIUS, LV_PART_MAIN);
         lv_obj_set_style_border_width(badge, 0, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(badge, lv_color_make(0xFF, 0xA5, 0x00), LV_PART_MAIN); /* Orange */
-        lv_obj_add_flag(badge, LV_OBJ_FLAG_HIDDEN);             /* Hidden by default */
+        lv_obj_set_style_bg_color(badge, lv_color_make(COLOR_BADGE_DIMMABLE), LV_PART_MAIN);
+        lv_obj_add_flag(badge, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
 
-        /* Populate tile struct */
-        s_tiles[i].id          = i;
-        s_tiles[i].tile        = tile;
-        s_tiles[i].icon_label  = icon;
-        s_tiles[i].name_label  = name;
-        s_tiles[i].state_label = state;
+        /* Populate tile state */
+        s_tiles[i].id           = i;
+        s_tiles[i].tile         = tile;
+        s_tiles[i].icon_label   = icon;
+        s_tiles[i].name_label   = name;
+        s_tiles[i].state_label  = state;
         s_tiles[i].dimmer_badge = badge;
-        s_tiles[i].state       = false;
-        s_tiles[i].configured  = false;
+        s_tiles[i].state        = false;
+        s_tiles[i].configured   = false;
         snprintf(s_tiles[i].name, TILE_NAME_MAX_LEN, "Tile_%d", i);
 
-        /* Sync badge visibility with current tile state (if any) */
+        /* Sync badge with any pre-existing dimmable state (e.g. NVS reload) */
         ui_panel_update_dimmer_badge(i, s_tiles[i].dimmable);
 
         lv_obj_add_event_cb(tile, tile_event_cb, LV_EVENT_ALL, &s_tiles[i]);
 
-        ESP_LOGD(TAG, "Tile[%d] created (row=%d col=%d)", i, row, col);
+        UI_LOGD(TAG, "Tile[%d] created (row=%d col=%d)", i, row, col);
     }
 
-    /* ---- Connection/loading overlay (visible until Zigbee is joined) ---- */
+    /* ---- Connection overlay (shown until Zigbee joins) ----------------- */
     s_conn_overlay = lv_obj_create(scr);
     lv_obj_set_size(s_conn_overlay, LCD_H_RES, LCD_V_RES);
     lv_obj_align(s_conn_overlay, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(s_conn_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_conn_overlay, LV_OPA_70, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_conn_overlay, UI_OVERLAY_OPA_CONN, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_conn_overlay, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(s_conn_overlay, 0, LV_PART_MAIN);
     lv_obj_clear_flag(s_conn_overlay, LV_OBJ_FLAG_SCROLLABLE);
 
     s_conn_spinner = lv_spinner_create(s_conn_overlay);
-    lv_obj_set_size(s_conn_spinner, 44, 44);
+    lv_obj_set_size(s_conn_spinner, UI_CONN_SPINNER_SIZE, UI_CONN_SPINNER_SIZE);
     lv_obj_align(s_conn_spinner, LV_ALIGN_CENTER, 0, -20);
 
     s_conn_label = lv_label_create(s_conn_overlay);
@@ -387,23 +497,23 @@ void ui_panel_build(lv_display_t *disp)
     lv_obj_set_style_text_font(s_conn_label, &lv_font_montserrat_14, LV_PART_MAIN);
     lv_obj_align(s_conn_label, LV_ALIGN_CENTER, 0, 22);
 
-    /* ---- Dimmer overlay (hidden by default, opened by tile long-press) ---- */
+    /* ---- Dimmer overlay (hidden; opened by long-press) ----------------- */
     s_dimmer_overlay = lv_obj_create(scr);
     lv_obj_set_size(s_dimmer_overlay, LCD_H_RES, LCD_V_RES);
     lv_obj_align(s_dimmer_overlay, LV_ALIGN_CENTER, 0, 0);
     lv_obj_set_style_bg_color(s_dimmer_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_dimmer_overlay, LV_OPA_60, LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s_dimmer_overlay, UI_OVERLAY_OPA_DIM, LV_PART_MAIN);
     lv_obj_set_style_border_width(s_dimmer_overlay, 0, LV_PART_MAIN);
     lv_obj_set_style_radius(s_dimmer_overlay, 0, LV_PART_MAIN);
     lv_obj_add_flag(s_dimmer_overlay, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(s_dimmer_overlay, dimmer_overlay_click_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *card = lv_obj_create(s_dimmer_overlay);
-    lv_obj_set_size(card, LCD_H_RES - 28, 180);
+    lv_obj_set_size(card, UI_DIMMER_CARD_W, UI_DIMMER_CARD_H);
     lv_obj_center(card);
-    lv_obj_set_style_radius(card, 12, LV_PART_MAIN);
+    lv_obj_set_style_radius(card, UI_DIMMER_CARD_RADIUS, LV_PART_MAIN);
     lv_obj_set_style_border_width(card, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(card, lv_color_make(0x2B, 0x2B, 0x2B), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(card, lv_color_make(COLOR_DIMMER_CARD_BG), LV_PART_MAIN);
 
     s_dimmer_title = lv_label_create(card);
     lv_label_set_text(s_dimmer_title, "Dimmer");
@@ -412,7 +522,7 @@ void ui_panel_build(lv_display_t *disp)
     lv_obj_align(s_dimmer_title, LV_ALIGN_TOP_MID, 0, 12);
 
     s_dimmer_slider = lv_slider_create(card);
-    lv_obj_set_size(s_dimmer_slider, 26, 110);
+    lv_obj_set_size(s_dimmer_slider, UI_SLIDER_W, UI_SLIDER_H);
     lv_obj_align(s_dimmer_slider, LV_ALIGN_CENTER, -40, 10);
     lv_slider_set_range(s_dimmer_slider, 0, 100);
     lv_slider_set_value(s_dimmer_slider, 0, LV_ANIM_OFF);
@@ -420,9 +530,9 @@ void ui_panel_build(lv_display_t *disp)
 
     /* Slider styling */
     lv_obj_set_style_radius(s_dimmer_slider, 8, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(0x3A, 0x3A, 0x3A), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(0xFF, 0xCC, 0x00), LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_white(), LV_PART_KNOB);
+    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(COLOR_SLIDER_TRACK), LV_PART_MAIN);
+    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(COLOR_TILE_ON),      LV_PART_INDICATOR);
+    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_white(),                  LV_PART_KNOB);
     lv_obj_set_style_pad_all(s_dimmer_slider, 2, LV_PART_MAIN);
 
     s_dimmer_value = lv_label_create(card);
@@ -431,5 +541,5 @@ void ui_panel_build(lv_display_t *disp)
     lv_obj_set_style_text_font(s_dimmer_value, &lv_font_montserrat_24, LV_PART_MAIN);
     lv_obj_align(s_dimmer_value, LV_ALIGN_CENTER, 40, 12);
 
-    ESP_LOGI(TAG, "Panel UI ready — %d tiles", MAX_TILES);
+    UI_LOGI(TAG, "Panel UI ready — %d tiles", MAX_TILES);
 }
