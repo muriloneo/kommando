@@ -9,8 +9,8 @@
 #   make -C firmware/host_test           # build + run all tests
 #   make -C firmware/host_test clean
 #
-# Add a new test by listing it in TESTS below and creating a matching
-# test_<name>.c in this directory. The source under test goes in SRC_<name>.
+# Add a new test by listing it in TESTS below, declaring SRC_<name>, and
+# creating a matching test_<name>.c in this directory.
 
 CC      := gcc
 CSTD    := -std=c11
@@ -21,9 +21,10 @@ CFLAGS  := $(CSTD) $(WARN) $(OPT) $(INC)
 
 BUILD   := build
 
-TESTS   := commands_parse
+TESTS   := commands_parse commands_dedupe
 
-SRC_commands_parse := ../main/commands_parse.c
+SRC_commands_parse  := ../main/commands_parse.c
+SRC_commands_dedupe := ../main/commands_dedupe.c ../main/commands_parse.c
 
 all: $(addprefix $(BUILD)/test_, $(TESTS))
 	@echo "==> Running host tests"
@@ -41,6 +42,9 @@ $(BUILD):
 	@mkdir -p $(BUILD)
 
 $(BUILD)/test_commands_parse: test_commands_parse.c $(SRC_commands_parse) | $(BUILD)
+	$(CC) $(CFLAGS) $^ -o $@
+
+$(BUILD)/test_commands_dedupe: test_commands_dedupe.c $(SRC_commands_dedupe) | $(BUILD)
 	$(CC) $(CFLAGS) $^ -o $@
 
 clean:

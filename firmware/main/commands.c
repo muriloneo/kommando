@@ -18,6 +18,8 @@
  */
 
 #include "commands.h"
+#include "commands_parse.h"
+#include "commands_dedupe.h"
 #include "tiles.h"
 #include "ui_state.h"
 #include "backlight.h"
@@ -25,7 +27,6 @@
 #include "config.h"
 
 #include <string.h>
-#include <stdlib.h>
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "nvs.h"
@@ -35,8 +36,8 @@
 
 static const char *TAG = "commands";
 
-/* ---- Duplicate detection cache: one entry per tile ---- */
-static char s_last_cfg_cmd[MAX_TILES][64];
+/* ---- Duplicate detection cache (pure-C, host-tested) ---- */
+static cmd_dedupe_cache_t s_dedupe_cache;
 
 /* ---- Icon string → LVGL symbol lookup table ---- */
 typedef struct {
@@ -80,193 +81,131 @@ static const char *resolve_icon(const char *icon_str)
    COMMAND PROCESSING
    ============================================================ */
 
+static esp_err_t apply_configure(const parsed_cmd_t *p)
+{
+    const int id = p->tile_id;
+    const char *symbol = resolve_icon(p->icon);
+    bool was_configured = s_tiles[id].configured;
+    bool keep_state     = s_tiles[id].state;
+
+    /* Update LVGL objects only when LVGL is ready */
+    if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
+        lv_label_set_text(s_tiles[id].icon_label, symbol);
+        lv_label_set_text(s_tiles[id].name_label, p->name);
+        lv_obj_set_style_text_color(s_tiles[id].icon_label, lv_color_white(), LV_PART_MAIN);
+        lv_obj_set_style_text_color(s_tiles[id].name_label, lv_color_white(), LV_PART_MAIN);
+        lv_color_t on_color = ui_panel_get_on_color();
+        lv_obj_set_style_bg_color(s_tiles[id].tile,
+            keep_state ? on_color : lv_color_make(COLOR_TILE_OFF),
+            LV_PART_MAIN);
+        lvgl_port_unlock();
+    }
+
+    s_tiles[id].configured           = true;
+    s_tiles[id].dimmable             = false;
+    s_tiles[id].level                = 0;
+    s_tiles[id].suppress_next_click  = false;
+    strncpy(s_tiles[id].name, p->name, TILE_NAME_MAX_LEN - 1);
+    s_tiles[id].name[TILE_NAME_MAX_LEN - 1] = '\0';
+
+    /* Clear dimmer badge on reconfigure */
+    if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
+        ui_panel_update_dimmer_badge(id, false);
+        lvgl_port_unlock();
+    }
+
+    ESP_LOGI(TAG, "Tile[%d] %s — icon='%s' name='%s'",
+             id,
+             was_configured ? "RECONFIGURED" : "CONFIGURED",
+             p->icon, s_tiles[id].name);
+    return ESP_OK;
+}
+
+static esp_err_t apply_set_state(const parsed_cmd_t *p)
+{
+    const int id = p->tile_id;
+    if (!s_tiles[id].configured) {
+        ESP_LOGW(TAG, "CMD S: tile %d not yet configured — skipping", id);
+        return ESP_OK;
+    }
+
+    bool old_state = s_tiles[id].state;
+    s_tiles[id].state = p->state;
+
+    if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
+        lv_color_t on_color = ui_panel_get_on_color();
+        lv_obj_set_style_bg_color(s_tiles[id].tile,
+            p->state ? on_color : lv_color_make(COLOR_TILE_OFF),
+            LV_PART_MAIN);
+        lvgl_port_unlock();
+    }
+
+    ESP_LOGI(TAG, "Tile[%d] '%s' %s → %s",
+             id, s_tiles[id].name,
+             old_state ? "ON" : "OFF",
+             p->state  ? "ON" : "OFF");
+    return ESP_OK;
+}
+
+static esp_err_t apply_dimmer(const parsed_cmd_t *p)
+{
+    const int id = p->tile_id;
+    s_tiles[id].dimmable = p->dimmer_enabled;
+    s_tiles[id].level    = p->level;
+
+    if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
+        ui_panel_update_dimmer_badge(id, s_tiles[id].dimmable);
+        lvgl_port_unlock();
+    }
+
+    ESP_LOGI(TAG, "Tile[%d] dimmer -> enabled=%d level=%d",
+             id, s_tiles[id].dimmable ? 1 : 0, (int)s_tiles[id].level);
+    return ESP_OK;
+}
+
+static esp_err_t apply_level(const parsed_cmd_t *p)
+{
+    const int id = p->tile_id;
+    s_tiles[id].level = p->level;
+    ESP_LOGI(TAG, "Tile[%d] level -> %d", id, (int)s_tiles[id].level);
+    return ESP_OK;
+}
+
 esp_err_t process_ha_command(char *payload)
 {
-    ESP_LOGI(TAG, "CMD: [%s]", payload);
+    ESP_LOGI(TAG, "CMD: [%s]", payload ? payload : "(null)");
 
-    char tmp[64];
-    strncpy(tmp, payload, sizeof(tmp) - 1);
-    tmp[sizeof(tmp) - 1] = '\0';
-
-    char *saveptr;
-    char *cmd    = strtok_r(tmp, ":", &saveptr);
-    char *id_str = strtok_r(NULL, ":", &saveptr);
-
-    if (!cmd || !id_str) {
-        ESP_LOGW(TAG, "CMD: malformed payload");
+    parsed_cmd_t parsed;
+    cmd_parse_status_t st = parse_ha_command(payload, &parsed);
+    if (st != CMD_PARSE_OK) {
+        ESP_LOGW(TAG, "CMD: parse error: %s", cmd_parse_status_str(st));
+        /* Out-of-configured-tiles is the only OK-to-ignore variant */
         return ESP_ERR_INVALID_ARG;
     }
 
-    int id = atoi(id_str);
-    if (id < 0 || id >= MAX_TILES) {
-        ESP_LOGW(TAG, "CMD: tile id %d out of range", id);
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    /* ----------------------------------------------------------
-       C:<id>:<icon>:<name> — Configure tile
-       ---------------------------------------------------------- */
-    if (strcmp(cmd, "C") == 0) {
-        char *icon_str = strtok_r(NULL, ":", &saveptr);
-        char *name_str = strtok_r(NULL, "",  &saveptr); /* Rest of string */
-
-        if (!icon_str) {
-            ESP_LOGW(TAG, "CMD C: missing icon for tile %d", id);
+    switch (parsed.kind) {
+        case CMD_KIND_CONFIGURE: return apply_configure(&parsed);
+        case CMD_KIND_SET_STATE: return apply_set_state(&parsed);
+        case CMD_KIND_DIMMER:    return apply_dimmer(&parsed);
+        case CMD_KIND_LEVEL:     return apply_level(&parsed);
+        default:
+            ESP_LOGW(TAG, "CMD: unknown kind");
             return ESP_ERR_INVALID_ARG;
-        }
-        if (!name_str) name_str = "";
-
-        const char *symbol = resolve_icon(icon_str);
-        bool was_configured = s_tiles[id].configured;
-        bool keep_state = s_tiles[id].state;
-
-        /* Update LVGL objects only when LVGL is ready */
-        if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
-            lv_label_set_text(s_tiles[id].icon_label,  symbol);
-            lv_label_set_text(s_tiles[id].name_label,  name_str);
-            lv_obj_set_style_text_color(s_tiles[id].icon_label, lv_color_white(), LV_PART_MAIN);
-            lv_obj_set_style_text_color(s_tiles[id].name_label, lv_color_white(), LV_PART_MAIN);
-            lv_color_t on_color = ui_panel_get_on_color();
-            lv_obj_set_style_bg_color(s_tiles[id].tile,
-                keep_state ? on_color : lv_color_make(COLOR_TILE_OFF),
-                LV_PART_MAIN);
-            lvgl_port_unlock();
-        }
-
-        s_tiles[id].configured = true;
-        s_tiles[id].dimmable = false;
-        s_tiles[id].level = 0;
-        s_tiles[id].suppress_next_click = false;
-        strncpy(s_tiles[id].name, name_str, TILE_NAME_MAX_LEN - 1);
-        s_tiles[id].name[TILE_NAME_MAX_LEN - 1] = '\0';
-
-        /* Clear dimmer badge on reconfigure */
-        if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
-            ui_panel_update_dimmer_badge(id, false);
-            lvgl_port_unlock();
-        }
-
-        ESP_LOGI(TAG, "Tile[%d] %s — icon='%s' name='%s'",
-                 id,
-                 was_configured ? "RECONFIGURED" : "CONFIGURED",
-                 icon_str, s_tiles[id].name);
-        return ESP_OK;
     }
-
-    /* ----------------------------------------------------------
-       S:<id>:<0|1> — Set visual state
-       ---------------------------------------------------------- */
-    if (strcmp(cmd, "S") == 0) {
-        char *state_str = strtok_r(NULL, ":", &saveptr);
-        if (!state_str) {
-            ESP_LOGW(TAG, "CMD S: missing state for tile %d", id);
-            return ESP_ERR_INVALID_ARG;
-        }
-
-        if (!s_tiles[id].configured) {
-            ESP_LOGW(TAG, "CMD S: tile %d not yet configured — skipping", id);
-            return ESP_OK;
-        }
-
-        bool new_state = (strcmp(state_str, "1") == 0);
-        bool old_state = s_tiles[id].state;
-        s_tiles[id].state = new_state;
-
-        if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
-            /* Honor night-mode color via ui_panel getter */
-            lv_color_t on_color = ui_panel_get_on_color();
-            lv_obj_set_style_bg_color(s_tiles[id].tile,
-                new_state ? on_color : lv_color_make(COLOR_TILE_OFF),
-                LV_PART_MAIN);
-            lvgl_port_unlock();
-        }
-
-        ESP_LOGI(TAG, "Tile[%d] '%s' %s → %s",
-                 id, s_tiles[id].name,
-                 old_state ? "ON" : "OFF",
-                 new_state ? "ON" : "OFF");
-        return ESP_OK;
-    }
-
-    /* ----------------------------------------------------------
-       D:<id>:<0|1>:<0..100> — Configure dimmer support + level
-       ---------------------------------------------------------- */
-    if (strcmp(cmd, "D") == 0) {
-        char *enabled_str = strtok_r(NULL, ":", &saveptr);
-        char *level_str   = strtok_r(NULL, ":", &saveptr);
-        if (!enabled_str || !level_str) {
-            ESP_LOGW(TAG, "CMD D: missing enabled/level for tile %d", id);
-            return ESP_ERR_INVALID_ARG;
-        }
-
-        int enabled = atoi(enabled_str);
-        int level   = atoi(level_str);
-        if (level < 0) level = 0;
-        if (level > 100) level = 100;
-
-        s_tiles[id].dimmable = (enabled != 0);
-        s_tiles[id].level = (uint8_t)level;
-
-        /* Update dimmer badge visibility on the tile */
-        if (s_tiles[id].tile != NULL && g_lvgl_ready && lvgl_port_lock(0)) {
-            ui_panel_update_dimmer_badge(id, s_tiles[id].dimmable);
-            lvgl_port_unlock();
-        }
-
-        ESP_LOGI(TAG, "Tile[%d] dimmer -> enabled=%d level=%d",
-                 id, s_tiles[id].dimmable ? 1 : 0, (int)s_tiles[id].level);
-        return ESP_OK;
-    }
-
-    /* ----------------------------------------------------------
-       L:<id>:<0..100> — Update dimmer level only
-       ---------------------------------------------------------- */
-    if (strcmp(cmd, "L") == 0) {
-        char *level_str = strtok_r(NULL, ":", &saveptr);
-        if (!level_str) {
-            ESP_LOGW(TAG, "CMD L: missing level for tile %d", id);
-            return ESP_ERR_INVALID_ARG;
-        }
-
-        int level = atoi(level_str);
-        if (level < 0) level = 0;
-        if (level > 100) level = 100;
-        s_tiles[id].level = (uint8_t)level;
-
-        ESP_LOGI(TAG, "Tile[%d] level -> %d", id, (int)s_tiles[id].level);
-        return ESP_OK;
-    }
-
-    ESP_LOGW(TAG, "CMD: unknown command '%s'", cmd);
-    return ESP_ERR_INVALID_ARG;
 }
 
 bool should_drop_duplicate_cfg(const char *payload)
 {
-    if (!payload) return false;
-
-    /* Only apply de-duplication to C: commands */
-    char tmp[64];
-    strncpy(tmp, payload, sizeof(tmp) - 1);
-    tmp[sizeof(tmp) - 1] = '\0';
-
-    char *saveptr;
-    char *cmd    = strtok_r(tmp, ":", &saveptr);
-    char *id_str = strtok_r(NULL, ":", &saveptr);
-
-    if (!cmd || !id_str || strcmp(cmd, "C") != 0) return false;
-
-    int tile_id = atoi(id_str);
-    if (tile_id < 0 || tile_id >= MAX_TILES) return false;
-
-    if (strcmp(s_last_cfg_cmd[tile_id], payload) == 0) {
-        ESP_LOGW(TAG, "Duplicate C: for Tile[%d] — ignored", tile_id);
-        return true;
+    bool drop = cmd_dedupe_should_drop(&s_dedupe_cache, payload);
+    if (drop) {
+        /* Re-parse just to recover tile_id for the log line. Cheap; only
+         * runs on actual duplicates. */
+        parsed_cmd_t p;
+        if (parse_ha_command(payload, &p) == CMD_PARSE_OK) {
+            ESP_LOGW(TAG, "Duplicate C: for Tile[%d] — ignored", p.tile_id);
+        }
     }
-
-    strncpy(s_last_cfg_cmd[tile_id], payload, sizeof(s_last_cfg_cmd[tile_id]) - 1);
-    s_last_cfg_cmd[tile_id][sizeof(s_last_cfg_cmd[tile_id]) - 1] = '\0';
-    return false;
+    return drop;
 }
 
 /* ============================================================

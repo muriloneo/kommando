@@ -5,6 +5,7 @@ idf_component_register(
         "tiles.c"
         "commands.c"
         "commands_parse.c"
+        "commands_dedupe.c"
         "display.c"
         "ui_panel.c"
         "ui_state.c"
