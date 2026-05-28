@@ -21,6 +21,7 @@
 #include "backlight.h"
 #include "tiles.h"    /* s_last_touch_tick                               */
 #include "config.h"
+#include "power.h"
 
 #include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -228,25 +229,8 @@ static void lcd_exit_sleep(void)
     ESP_LOGI(TAG, "LCD HW wake (SLPOUT)");
 }
 
-static bool configure_touch_wakeup_source(void)
-{
-    /* CST816 INT is active-low: wake when pin goes low */
-    if (!esp_sleep_is_valid_wakeup_gpio(PIN_TOUCH_INT)) {
-        ESP_LOGE(TAG, "GPIO%d is not valid for deep-sleep wakeup", (int)PIN_TOUCH_INT);
-        return false;
-    }
-
-    uint64_t io_mask = (1ULL << PIN_TOUCH_INT);
-    esp_err_t err = esp_sleep_enable_ext1_wakeup(io_mask, ESP_EXT1_WAKEUP_ANY_LOW);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to enable ext1 wake on GPIO%d: %s",
-                 (int)PIN_TOUCH_INT, esp_err_to_name(err));
-        return false;
-    }
-
-    ESP_LOGI(TAG, "Deep sleep wake source set: touch INT GPIO%d (ANY_LOW)", (int)PIN_TOUCH_INT);
-    return true;
-}
+/* Wake-source config moved to power.c (power_enable_touch_wakeup) so the
+ * C6-native LP_IO API path is shared with any future wake sources. */
 
 void display_timeout_task(void *arg)
 {
@@ -301,9 +285,9 @@ void display_timeout_task(void *arg)
                 ESP_LOGI(TAG, "Screen off (sleep, idle %us)", idle_s);
 
                 if (g_deep_sleep_enabled) {
-                    if (configure_touch_wakeup_source()) {
+                    if (power_enable_touch_wakeup()) {
                         ESP_LOGI(TAG, "Entering deep sleep (idle %us)", idle_s);
-                        vTaskDelay(pdMS_TO_TICKS(20));
+                        power_prepare_deep_sleep();
                         esp_deep_sleep_start();
                     } else {
                         ESP_LOGW(TAG, "Deep sleep skipped: wake source config failed");

@@ -12,11 +12,13 @@ idf_component_register(
         "zigbee.c"
         "led.c"
         "button.c"
+        "power.c"
     INCLUDE_DIRS "."
     REQUIRES
         app_update
         esp_timer
         driver
+        esp_hw_support
         led_strip
         nvs_flash
         esp_lcd

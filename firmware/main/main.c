@@ -29,6 +29,7 @@
 #include "zigbee.h"
 #include "led.h"
 #include "button.h"
+#include "power.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -128,6 +129,10 @@ void app_main(void)
 {
     ESP_LOGI(TAG, "Kommando firmware v%s", FW_VERSION_STRING);
 
+    /* Latch the wake cause before anything resets it. Used below to skip
+     * cosmetic startup when we resumed from a touch wake. */
+    power_log_wakeup_cause();
+
     /* NVS */
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -139,9 +144,15 @@ void app_main(void)
     /* Restore persisted settings (backlight level, timeouts, night mode, ...) */
     load_settings_from_nvs();
 
-    /* Status LED -- pairing animation until network joins */
+    /* Status LED -- pairing animation until network joins, but skip it
+     * if we just woke from deep sleep (network state is restored from
+     * NVS by the Zigbee stack; flashing the LED again is just noise). */
     ESP_ERROR_CHECK(led_init());
-    led_set_pattern(LED_PATTERN_PAIRING);
+    if (!power_woke_from_deep_sleep()) {
+        led_set_pattern(LED_PATTERN_PAIRING);
+    } else {
+        led_set_pattern(LED_PATTERN_OFF);
+    }
 
     /* Physical button (short press = LED mode, long press = re-pair) */
     button_init();
