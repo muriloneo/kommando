@@ -1,9 +1,0 @@
-
-
-# Load bootloader symbols
-set confirm off
-    add-symbol-file C:/codes/esp32/kommando/firmware/build/bootloader/bootloader.elf
-set confirm on
-
-# Load application symbols
-file C:/codes/esp32/kommando/firmware/build/kommando.elf
