@@ -30,7 +30,20 @@ jobs:
     env:
       FW_DIR: firmware
 
+    outputs:
+      branch_slug: ${{ steps.ref.outputs.slug }}
+      branch_name: ${{ steps.ref.outputs.name }}
+
     steps:
+      - name: Resolve branch slug
+        id: ref
+        run: |
+          NAME="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          SLUG=$(printf '%s' "$NAME" | tr '/ ' '--' | tr -cd 'A-Za-z0-9._-')
+          if [ -z "$SLUG" ]; then SLUG="branch"; fi
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -45,11 +58,11 @@ jobs:
           path: firmware
           command: idf.py build
 
-      - name: Upload latest flashable firmware artifacts
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Upload flashable firmware artifacts
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
-          name: kommando-firmware-main-${{ github.run_number }}
+          name: kommando-firmware-${{ steps.ref.outputs.slug }}-${{ github.run_number }}
           retention-days: 30
           path: |
             firmware/build/kommando.bin
@@ -123,8 +136,8 @@ jobs:
             firmware/build/bootloader/bootloader.bin
             firmware/build/partition_table/partition-table.bin
 
-  auto-release-main:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  auto-release-branch:
+    if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/')
     needs: firmware-ci
     runs-on: ubuntu-latest
 
@@ -134,16 +147,16 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Download latest flashable firmware artifacts
+      - name: Download flashable firmware artifacts
         uses: actions/download-artifact@v4
         with:
-          name: kommando-firmware-main-${{ github.run_number }}
-          path: latest-main-artifacts
+          name: kommando-firmware-${{ needs.firmware-ci.outputs.branch_slug }}-${{ github.run_number }}
+          path: latest-branch-artifacts
 
       - name: Validate firmware binary for release
         id: fw_check
         run: |
-          BIN="latest-main-artifacts/kommando.bin"
+          BIN="latest-branch-artifacts/kommando.bin"
 
           if [ ! -f "$BIN" ]; then
             echo "Missing firmware binary: $BIN" >&2
@@ -173,16 +186,21 @@ jobs:
       - name: Resolve previous release for comparison
         id: prev_release
         uses: actions/github-script@v7
+        env:
+          BRANCH_SLUG: ${{ needs.firmware-ci.outputs.branch_slug }}
         with:
           script: |
             const { owner, repo } = context.repo;
+            const slug = process.env.BRANCH_SLUG;
             const releases = await github.paginate(github.rest.repos.listReleases, {
               owner,
               repo,
-              per_page: 30,
+              per_page: 100,
             });
 
-            const previous = releases.find(r => !r.draft && !r.prerelease);
+            const previous = releases.find(
+              r => !r.draft && (r.tag_name || '').startsWith(`${slug}-`)
+            );
             if (!previous) {
               core.setOutput('tag', '');
               core.setOutput('name', '');
@@ -200,10 +218,13 @@ jobs:
 
       - name: Prepare auto-release metadata and bundle
         id: release_meta
+        env:
+          BRANCH_SLUG: ${{ needs.firmware-ci.outputs.branch_slug }}
+          BRANCH_NAME: ${{ needs.firmware-ci.outputs.branch_name }}
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
-          TAG_NAME="main-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
-          RELEASE_NAME="Main Firmware Build #${GITHUB_RUN_NUMBER} (${SHORT_SHA})"
+          TAG_NAME="${BRANCH_SLUG}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+          RELEASE_NAME="${BRANCH_NAME} Firmware Build #${GITHUB_RUN_NUMBER} (${SHORT_SHA})"
 
           {
             echo "tag=${TAG_NAME}"
@@ -234,7 +255,7 @@ jobs:
           DOCS_COUNT=$(echo "$FILES_CHANGED" | grep -E '\.md$|^firmware/releases/' -c || true)
 
           cat > release-body.md <<'EOF'
-          Automated release for the latest successful `main` build, intended for ESPHome Web Flasher/manual flash use.
+          Automated release for the latest successful build of branch __BRANCH__, intended for ESPHome Web Flasher/manual flash use.
 
           ## Download
           - `kommando.bin` (standalone firmware image)
@@ -264,6 +285,7 @@ jobs:
           sed -i "s#__CUR_SIZE__#${CUR_SIZE}#g" release-body.md
           sed -i "s#__CUR_SHA__#${{ steps.fw_check.outputs.sha256 }}#g" release-body.md
           sed -i "s#__CUR_MAGIC__#${{ steps.fw_check.outputs.magic }}#g" release-body.md
+          sed -i "s#__BRANCH__#${BRANCH_NAME}#g" release-body.md
           sed -i "s#__PREV_TAG__#${PREV_TAG:-none}#g" release-body.md
           sed -i "s#__PREV_SIZE__#${PREV_SIZE:-n/a}#g" release-body.md
           sed -i "s#__SIZE_DIFF__#${SIZE_DIFF}#g" release-body.md
@@ -286,15 +308,15 @@ jobs:
             echo "- Size delta: ${SIZE_DIFF} bytes"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publish automatic main release
+      - name: Publish automatic branch release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_meta.outputs.tag }}
           target_commitish: ${{ github.sha }}
           name: ${{ steps.release_meta.outputs.name }}
-          prerelease: false
-          make_latest: true
+          prerelease: ${{ github.ref != 'refs/heads/main' }}
+          make_latest: ${{ github.ref == 'refs/heads/main' }}
           generate_release_notes: true
           body_path: release-body.md
           files: |
-            latest-main-artifacts/kommando.bin
+            latest-branch-artifacts/kommando.bin
