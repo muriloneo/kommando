@@ -20,6 +20,7 @@
 
 #include "lvgl.h"
 #include "ui_events.h"
+#include "ui_theme.h"
 #include <stdbool.h>
 
 /**
@@ -81,3 +82,20 @@ void ui_panel_set_connection_overlay(bool connected, const char *status_text);
  * Used by commands.c when applying an S: state-change command.
  */
 lv_color_t ui_panel_get_on_color(void);
+
+/**
+ * Apply a complete tile configuration and paint its visual state.
+ *
+ * Single entry point for setting a tile's state from the simulator,
+ * Zigbee commands, or NVS reload.  Updates ui_tile_t fields AND
+ * repaints LVGL objects (bg colour, name label, dimmer badge).
+ *
+ * @param tile_id    Tile index (0–5)
+ * @param configured  false = show as empty/unconfigured placeholder
+ * @param name       Display name (ignored when configured=false)
+ * @param dimmable   true = show orange dimmer badge
+ * @param state      true = ON colour, false = OFF colour
+ * @param level      Current dimmer level (0–100, informational)
+ */
+void ui_panel_apply_tile(int tile_id, bool configured, const char *name,
+                         bool dimmable, bool state, uint8_t level);

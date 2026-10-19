@@ -1,0 +1,586 @@
+{
+  "J1": [
+    {
+      "pin": 1,
+      "row_y": 106.0,
+      "label": "LCD_RST\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "LCD_RST\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 2,
+      "row_y": 112.8,
+      "label": "SCLK\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "SCLK\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 3,
+      "row_y": 121.0,
+      "label": "LCD_DC\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "LCD_DC\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 4,
+      "row_y": 127.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 5,
+      "row_y": 136.0,
+      "label": "LCD_CS\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "LCD_CS\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 6,
+      "row_y": 142.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 7,
+      "row_y": 151.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 8,
+      "row_y": 157.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 9,
+      "row_y": 165.8,
+      "label": "MOSI\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "MOSI\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 10,
+      "row_y": 172.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 11,
+      "row_y": 180.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 12,
+      "row_y": 189.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 13,
+      "row_y": 195.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 14,
+      "row_y": 204.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 15,
+      "row_y": 210.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 16,
+      "row_y": 219.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 17,
+      "row_y": 225.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 18,
+      "row_y": 234.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 19,
+      "row_y": 240.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 20,
+      "row_y": 249.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 21,
+      "row_y": 255.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 22,
+      "row_y": 264.0,
+      "label": "TP_SCL\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "TP_SCL\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 23,
+      "row_y": 272.0,
+      "label": "TP_SDA\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "TP_SDA\"",
+          "dx": -36.0
+        },
+        {
+          "x": 722.0,
+          "text": "TP_RST\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 24,
+      "row_y": 278.8,
+      "label": "TP_RST\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "TP_RST\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 25,
+      "row_y": 285.8,
+      "label": "TP_INT\"",
+      "candidates": [
+        {
+          "x": 722.0,
+          "text": "TP_INT\"",
+          "dx": -36.0
+        }
+      ]
+    },
+    {
+      "pin": 26,
+      "row_y": 293.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 27,
+      "row_y": 308.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 28,
+      "row_y": 317.0,
+      "label": null,
+      "candidates": []
+    }
+  ],
+  "J2": [
+    {
+      "pin": 0,
+      "row_y": 302.0,
+      "label": "GND",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "GND",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 1,
+      "row_y": 157.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 2,
+      "row_y": 165.8,
+      "label": "LCD_BL",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "LCD_BL",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 3,
+      "row_y": 172.8,
+      "label": "GND",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "GND",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 4,
+      "row_y": 180.8,
+      "label": "SCLK",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "SCLK",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 5,
+      "row_y": 189.0,
+      "label": "MOSI",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "MOSI",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 6,
+      "row_y": 195.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 7,
+      "row_y": 204.0,
+      "label": "LCD_DC",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "LCD_DC",
+          "dx": -31.9
+        },
+        {
+          "x": 74.1,
+          "text": "LCD_RST",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 8,
+      "row_y": 210.8,
+      "label": "LCD_RST",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "LCD_RST",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 9,
+      "row_y": 219.0,
+      "label": "LCD_CS",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "LCD_CS",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 10,
+      "row_y": 225.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 11,
+      "row_y": 234.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 12,
+      "row_y": 240.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 13,
+      "row_y": 249.0,
+      "label": "TP_SCL",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "TP_SCL",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 14,
+      "row_y": 255.8,
+      "label": "TP_SDA",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "TP_SDA",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 15,
+      "row_y": 264.0,
+      "label": "TP_INT",
+      "candidates": [
+        {
+          "x": 74.1,
+          "text": "TP_INT",
+          "dx": -31.9
+        }
+      ]
+    },
+    {
+      "pin": 16,
+      "row_y": 272.0,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 17,
+      "row_y": 278.8,
+      "label": null,
+      "candidates": []
+    },
+    {
+      "pin": 18,
+      "row_y": 285.8,
+      "label": null,
+      "candidates": []
+    }
+  ],
+  "J3": [
+    {
+      "pin": 0,
+      "row_y": 283.0,
+      "label": "GND",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "GND",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 1,
+      "row_y": 180.8,
+      "label": "VCC",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "VCC",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 2,
+      "row_y": 189.0,
+      "label": "GND",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "GND",
+          "dx": 16.8
+        },
+        {
+          "x": 224.8,
+          "text": "MOSI",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 3,
+      "row_y": 195.8,
+      "label": "MOSI",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "MOSI",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 4,
+      "row_y": 204.0,
+      "label": "SCLK",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "SCLK",
+          "dx": 16.8
+        },
+        {
+          "x": 224.8,
+          "text": "LCD_CS",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 5,
+      "row_y": 210.8,
+      "label": "LCD_CS",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "LCD_CS",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 6,
+      "row_y": 219.0,
+      "label": "LCD_DC",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "LCD_DC",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 7,
+      "row_y": 225.8,
+      "label": "LCD_RST",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "LCD_RST",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 8,
+      "row_y": 234.0,
+      "label": "LCD_BL",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "LCD_BL",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 9,
+      "row_y": 240.8,
+      "label": "TP_SDA",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "TP_SDA",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 10,
+      "row_y": 249.0,
+      "label": "TP_SCL",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "TP_SCL",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 11,
+      "row_y": 255.8,
+      "label": "TP_RST",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "TP_RST",
+          "dx": 16.8
+        }
+      ]
+    },
+    {
+      "pin": 12,
+      "row_y": 264.0,
+      "label": "TP_INT",
+      "candidates": [
+        {
+          "x": 224.8,
+          "text": "TP_INT",
+          "dx": 16.8
+        }
+      ]
+    }
+  ]
+}

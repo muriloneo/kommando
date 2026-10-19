@@ -1,0 +1,719 @@
+{
+  "generated": "see git/commit e554221 era, session 2026-09-14",
+  "canonical_board_rev": "ki-kad/pcb/3rd - Updated_PCB_FIle/ProPrj_Murilofrier_PCB_2026-03-29.epro",
+  "rule": "Never re-render or re-read these images; never re-extract the netlist. Use the decoded tables in ../README.md and these files.",
+  "scripts": {
+    "all_revs.py": {
+      "sha256": "1b85d701e64080c9936297bfc2ef332c9a6ac8ecfdd0bf5538830264cf744c3f",
+      "bytes": 2710,
+      "answers": "enumerate ALL .epro revisions in ki-kad/pcb/ + netlist diff",
+      "tool": "docs/hardware/tools/all_revs.py"
+    },
+    "board_probe.py": {
+      "sha256": "14bf12d611b013f206558e02dfbc288762a0eade03cf046075484d54586c217c",
+      "bytes": 1333,
+      "answers": "first raw .epro container probe",
+      "tool": "docs/hardware/tools/board_probe.py"
+    },
+    "board_probe2.py": {
+      "sha256": "3219c634af8ea490ba4c475dc447962fba95e2eab7be612e62305efba48e52a2",
+      "bytes": 1425,
+      "answers": "netlist collection discovery in .epro",
+      "tool": "docs/hardware/tools/board_probe2.py"
+    },
+    "board_probe3.py": {
+      "sha256": "2acfeb44a4987370d703b1a95bc0addca168d8b7d51ef8d1fd20e284037fa169",
+      "bytes": 2289,
+      "answers": "U3 pin1->pin3 bodge check",
+      "tool": "docs/hardware/tools/board_probe3.py"
+    },
+    "board_probe4.py": {
+      "sha256": "98c0826d89f8011ddfec7f52173f71fdee57979278f9a79b0d18506a80385069",
+      "bytes": 1862,
+      "answers": "PAD_NET record structure",
+      "tool": "docs/hardware/tools/board_probe4.py"
+    },
+    "board_probe5.py": {
+      "sha256": "2d9634604fe9ff21716c33a93a63d2c7c529d810a312cac4a86fa6880cdb78ca",
+      "bytes": 1198,
+      "answers": "component designator -> package map",
+      "tool": "docs/hardware/tools/board_probe5.py"
+    },
+    "board_probe6.py": {
+      "sha256": "d49ad2fe4d0950dead084b998a443a6fbc0f6997bc77125b9fe9361d38d83dd8",
+      "bytes": 1489,
+      "answers": "net -> pin membership dump",
+      "tool": "docs/hardware/tools/board_probe6.py"
+    },
+    "board_final.py": {
+      "sha256": "e53122c8710982d99d4727dbcbde6debef918a79d82ad098cdc09e3ab35edd60",
+      "bytes": 2833,
+      "answers": "FINAL board netlist: every component pin -> net",
+      "tool": "docs/hardware/tools/board_final.py"
+    },
+    "raw_netdump.py": {
+      "sha256": "a459e80501f950812089ca88663eff9ac24c681f1776db5aa6b65e13c556a9d3",
+      "bytes": 1008,
+      "answers": "raw PAD_NET records for screen nets + module pad->net table",
+      "tool": "docs/hardware/tools/raw_netdump.py"
+    },
+    "netmap_verify.py": {
+      "sha256": "90d2839f01e8f4659c9cce426f2812fbcdf84747110524a349259722a75f7e14",
+      "bytes": 2686,
+      "answers": "PCB *.epcb PAD_NET joined to SYMBOL pin NAME/NUMBER",
+      "tool": "docs/hardware/tools/netmap_verify.py"
+    },
+    "sym_pins.py": {
+      "sha256": "c003d38753d79da122e06d55ae066f0b2b8b1645dff7e41c655ddbaa405a7c32",
+      "bytes": 866,
+      "answers": "symbol PIN/ATTR structure (pin number/name pairing method)",
+      "tool": "docs/hardware/tools/sym_pins.py"
+    },
+    "u1_full_pinmap.py": {
+      "sha256": "982d207b8189d00eaedb9e2e7da71b93817f67e02e51918d3fc6427ab5da1fdc",
+      "bytes": 986,
+      "answers": "U1 (ESP32-C6-WROOM-1) pad -> net, all 37 pads",
+      "tool": "docs/hardware/tools/u1_full_pinmap.py"
+    },
+    "screen_pins_final.py": {
+      "sha256": "d9c309417964e84aa4a912405f3a70a97dc72f6f99101447e75717c09016d1e5",
+      "bytes": 3160,
+      "answers": "screen pin extraction attempt (exit 1 - superseded by netmap_verify.py)",
+      "tool": "docs/hardware/tools/screen_pins_final.py"
+    },
+    "render_sch.py": {
+      "sha256": "9a4c33139ce65154c054f19894a593bd4c051258c98713784bbf6fc03c537507",
+      "bytes": 404,
+      "answers": "render module schematic PDF page -> PNG (pymupdf)",
+      "tool": "docs/hardware/tools/render_sch.py"
+    },
+    "sch_words.py": {
+      "sha256": "0c427fdbc99077f55c40bbd4ac096409c4d338e955ec64e73f039a2ec59e6939",
+      "bytes": 921,
+      "answers": "module schematic text layer with coordinates",
+      "tool": "docs/hardware/tools/sch_words.py"
+    },
+    "sch_conn.py": {
+      "sha256": "36a35c1a8e5d68fb28f608bb4a8246a3518fcb0d154f1cb651759336e2edfeb2",
+      "bytes": 768,
+      "answers": "connector neighbourhood dump (J1/J2/J3)",
+      "tool": "docs/hardware/tools/sch_conn.py"
+    },
+    "sch_full.py": {
+      "sha256": "3a0efba75b84282f1112ad66d9639f4c3cafda9f691f05e040dfa543a3b0ae12",
+      "bytes": 1127,
+      "answers": "reconstruct connector pin->net tables from text coords",
+      "tool": "docs/hardware/tools/sch_full.py"
+    },
+    "sch_j1.py": {
+      "sha256": "df7c777b2e2154866e3ed5e3370719a05fcafd58b3ac99b211dc7e774614c3f2",
+      "bytes": 969,
+      "answers": "J1 full pin list",
+      "tool": "docs/hardware/tools/sch_j1.py"
+    },
+    "sch_crops.py": {
+      "sha256": "94a20ac6e56ed6fe105fa6fce60ef982984cf848dbad14cf66d442bcae883f73",
+      "bytes": 521,
+      "answers": "tight high-DPI crops (sch_j1/j2/j3.png) for vision",
+      "tool": "docs/hardware/tools/sch_crops.py"
+    },
+    "provenance.py": {
+      "sha256": "b94428063012a629a002d4eb9b2f316e4e72944e6a4acd18fe07da53e985ede5",
+      "bytes": 1841,
+      "answers": "trace firmware/easyeda.json netlist vs current board (README table origin)",
+      "tool": "docs/hardware/tools/provenance.py"
+    },
+    "config_h_diff.py": {
+      "sha256": "e8936a80c8103613781dc065ad9ce4e8b96046b71eac0f934bd5820ad23bd66e",
+      "bytes": 3875,
+      "answers": "config.h HEAD vs working-tree pin diff",
+      "tool": "docs/hardware/tools/config_h_diff.py"
+    },
+    "config_h_patch_v3.py": {
+      "sha256": "053f25cf77f7306c106e624c1ac5ba0a5140668553aaa0a892f4911c15590b79",
+      "bytes": 5324,
+      "answers": "config.h pin patch generator (v3)",
+      "tool": "docs/hardware/tools/config_h_patch_v3.py"
+    },
+    "config_h_patch_v4.py": {
+      "sha256": "ae4cce7613f5fc37bf5a410bb1b11c16a4e5a525c594266860270d261823a039",
+      "bytes": 2721,
+      "answers": "config.h pin patch generator (v4)",
+      "tool": "docs/hardware/tools/config_h_patch_v4.py"
+    },
+    "ci_patch.py": {
+      "sha256": "1373bc37ddf8076efd4aaa55ae398c8aeb86e3bfd2340edc78b8fad8272037a0",
+      "bytes": 8073,
+      "answers": "CI rework: one release tag per branch (became commit e554221)",
+      "tool": "docs/hardware/tools/ci_patch.py"
+    }
+  },
+  "images": {
+    "lcd_sch_p0.png": {
+      "sha256": "40bd0d2593864c0146ed843226b48367b0a3ebdf678194b770d8108024150269",
+      "bytes": 245675,
+      "path": "C:\\Users\\Murilo\\AppData\\Local\\hermes\\cache\\kommando-hardware\\images\\lcd_sch_p0.png",
+      "note": "cached render - do NOT regenerate"
+    },
+    "sch_j1.png": {
+      "sha256": "998130a0ff6f3fd8f25c3aaf8a14842e938f895240890477fa04f20285d978b6",
+      "bytes": 96382,
+      "path": "C:\\Users\\Murilo\\AppData\\Local\\hermes\\cache\\kommando-hardware\\images\\sch_j1.png",
+      "note": "cached render - do NOT regenerate"
+    },
+    "sch_j2.png": {
+      "sha256": "d3b2582c20273f91e76b92b5d912bd4ac083c4fd22f889732171c0b1ad8fa8bb",
+      "bytes": 55596,
+      "path": "C:\\Users\\Murilo\\AppData\\Local\\hermes\\cache\\kommando-hardware\\images\\sch_j2.png",
+      "note": "cached render - do NOT regenerate"
+    },
+    "sch_j3.png": {
+      "sha256": "ac37db9403a1afcf7eb5dc50c4ca172c497c32af04f4d32774a66498305db53c",
+      "bytes": 49110,
+      "path": "C:\\Users\\Murilo\\AppData\\Local\\hermes\\cache\\kommando-hardware\\images\\sch_j3.png",
+      "note": "cached render - do NOT regenerate"
+    }
+  },
+  "netlist": {
+    "project.json": {
+      "sha256": "1b4e94ec87ca4386cab2c3934130a4a20ccf28511cee45dfe668093975e22cc5",
+      "bytes": 127965
+    },
+    "FOOTPRINT/098d711621464355954a6984f633d21d.efoo": {
+      "sha256": "8a2024d2bca32c04cf6d524b74684ee3decc8feb990339c4f79a4797369e0c0c",
+      "bytes": 7046
+    },
+    "FOOTPRINT/0ca9d8ff98df49cf89e3346f4c3db4e3.efoo": {
+      "sha256": "0245e94958f52e8adebf5b131dc488ba2f3ac151275e0cceb561bb2c9fabb888",
+      "bytes": 3166
+    },
+    "FOOTPRINT/0f7f06a5b030479a835cf1f2641f95ce.efoo": {
+      "sha256": "25d4aa63f04dc8019a9e899967fdcbfc277d63b0d159a03375b679e0b43e2b5a",
+      "bytes": 3905
+    },
+    "FOOTPRINT/14657ac54680426696c426d96a51bace.efoo": {
+      "sha256": "700c1be4524361afe0a9364500a6be25c9e6597991a70665ac317c12d836560a",
+      "bytes": 4854
+    },
+    "FOOTPRINT/181222c0362847bb9e43f25a9581d87c.efoo": {
+      "sha256": "eab6910f830760fc56d460fb94e3e0fa68dd43c4daf8cbf85aa5c943b05639fb",
+      "bytes": 5919
+    },
+    "FOOTPRINT/1873ad75d8fc4e1280c30a83619e310c.efoo": {
+      "sha256": "8affeb2b3625694a7be821324ba9090964e955f772c2d2ba7c0cf9b0b53eb46a",
+      "bytes": 5311
+    },
+    "FOOTPRINT/21f9f32031fd47b5911239e1a841c27d.efoo": {
+      "sha256": "59a51b28d56b22e899d93423a6fa58af8d847c4fbd2695ddcbe94ca052f540ae",
+      "bytes": 7952
+    },
+    "FOOTPRINT/22594e84d7124916b4de8029389cc8b2.efoo": {
+      "sha256": "1c7d35694072eefde101a171afa05aceda607d10c23f27e2bb340cf424dc7b23",
+      "bytes": 8835
+    },
+    "FOOTPRINT/250b17c27e994e25a8cbbb352d414788.efoo": {
+      "sha256": "a6d71b4482bc5f41a621db3e83298c5dfd54c6687bfc478acecdde00862ba510",
+      "bytes": 4807
+    },
+    "FOOTPRINT/32be774b6d7143c79e57bc5f9e5d82e9.efoo": {
+      "sha256": "b9224361c8a47dc56ebe35468df868282df73eeaf4226dc35a09226e2b3d9604",
+      "bytes": 6131
+    },
+    "FOOTPRINT/3cb8f7b4368345c9a73252ea65e3a439.efoo": {
+      "sha256": "d1eab5b402feed5119d38282cb59eb2bf3a2ec1ffc0697cf0525af9f7fc34cd1",
+      "bytes": 2955
+    },
+    "FOOTPRINT/42a31793b3b847a9873d217fe836304e.efoo": {
+      "sha256": "ab63998bd72c51172d4c74c94dc6785c4d38a3174721b523a38da0b3b08ff489",
+      "bytes": 4115
+    },
+    "FOOTPRINT/4e22123fedae40acb73705dbd83a6e4c.efoo": {
+      "sha256": "6f71b4635c0af385d68a558f749b2e927732872bfe65f566f2f07d82323e77b1",
+      "bytes": 6433
+    },
+    "FOOTPRINT/4e68938dc2aa4980b303f68a9f90505d.efoo": {
+      "sha256": "e00468d8c4b3deaec91599d8773dd748648be18f1161f148414a4632ae6ac998",
+      "bytes": 3231
+    },
+    "FOOTPRINT/53869ae70ce94f398a0a68e3595fce32.efoo": {
+      "sha256": "22612734716995bad4fd66c93daa00180d35e33ce479fd9e87ddf3023c4f800d",
+      "bytes": 8539
+    },
+    "FOOTPRINT/611a28454fb149538eacf1c091b5d96e.efoo": {
+      "sha256": "06469797a9d15482fe503612f27241061cf27bc81bc9e468e1e8c748bf26e2d8",
+      "bytes": 4154
+    },
+    "FOOTPRINT/63b0dbac25904659bc21a752ee22a29b.efoo": {
+      "sha256": "fdec494ca5562958353b4d03da2bdbb075f81672f2f655210ff17b16077eb5c7",
+      "bytes": 2968
+    },
+    "FOOTPRINT/69982451f08641fcbad777923b8d6537.efoo": {
+      "sha256": "c085d6b2f9e7b1757d4c56ed1faca52236f741a9b893f23762713fb126a02ca4",
+      "bytes": 5148
+    },
+    "FOOTPRINT/6d89e484b4844e688c03220a4d3795a5.efoo": {
+      "sha256": "2bafaeb4d9130a054e94a10024f17fce160e667005e504bd49a89d36979ee117",
+      "bytes": 2969
+    },
+    "FOOTPRINT/73ceb98a71aa4fb592a9f3382e9f939b.efoo": {
+      "sha256": "6340ad9774fc860f4f3b56d25c754029591a92945822a3d89eb666ee8a84d3cf",
+      "bytes": 7453
+    },
+    "FOOTPRINT/76b014322c7c40f6a0be04b94656b062.efoo": {
+      "sha256": "d783c8c9500860ddcd8796c12b999e8e1ff6df7cffe1d85a9604a8b8e7166206",
+      "bytes": 2199
+    },
+    "FOOTPRINT/7865df45cf644564b71a76bd976bdc68.efoo": {
+      "sha256": "4e4e42f2d3f7fd0f078fd1bf8e21cdf95f5c000017549a6842b2ac9ef34521bf",
+      "bytes": 8989
+    },
+    "FOOTPRINT/7eabfd23e7144f6fb8fc83a474bc5c6e.efoo": {
+      "sha256": "fdec494ca5562958353b4d03da2bdbb075f81672f2f655210ff17b16077eb5c7",
+      "bytes": 2968
+    },
+    "FOOTPRINT/865666ea9c4e4265b6e0d39379a1a046.efoo": {
+      "sha256": "9b3bd88b6840c4f79c2530b3a845179f2563689850770369860a3ffbd947c22b",
+      "bytes": 3491
+    },
+    "FOOTPRINT/9386e209b79447079447fb18118f5a53.efoo": {
+      "sha256": "d0cd38b1a56074fd01c80009108abe20b37d6f3b822c8ddd00ed38efbb76c852",
+      "bytes": 2316
+    },
+    "FOOTPRINT/93cf94caa85c488882d1ad70a9373e59.efoo": {
+      "sha256": "488f12117b6f0366254045c33188e21f72c5c30140e6b8ef129f0ae719578d53",
+      "bytes": 7539
+    },
+    "FOOTPRINT/9bc3e02435a1414587dabb95fa04d5d8.efoo": {
+      "sha256": "f1f4b65243a8a1055439a98cb7babe820ad8c6af251e913be2835c2ffcb766c9",
+      "bytes": 5058
+    },
+    "FOOTPRINT/a7490d898df94adf9ffb5a13a7b0c6e8.efoo": {
+      "sha256": "508ebd8ae22447d0855a608d3dc219af5939f262133d74bac03e323c4619e44a",
+      "bytes": 5966
+    },
+    "FOOTPRINT/b08029003c41448da866fb34855a3ed8.efoo": {
+      "sha256": "84c251c6a5d672527e85372453088cfeaee8d31810456eeb3c1673f10d26dd7f",
+      "bytes": 3896
+    },
+    "FOOTPRINT/b234641657b64c5eab5cc31093a074e9.efoo": {
+      "sha256": "a73ed3e8e10707b5aab7743801303044b9e67a7627de22ed5db3d26960a5ee86",
+      "bytes": 3328
+    },
+    "FOOTPRINT/bbb2e04e2dec4d5ca59b22e129361c00.efoo": {
+      "sha256": "6c21990f16778eae51df450cfb46a8108cf09b79732d820a33f7912b8538b81c",
+      "bytes": 5406
+    },
+    "FOOTPRINT/c38ef93b0f3b4a76b12195177b670c10.efoo": {
+      "sha256": "6c87eb937a2d864874e6f0e2b0d9d8c268de685fcfea18fd5ad41a8dea61f8a3",
+      "bytes": 6483
+    },
+    "FOOTPRINT/c4c72ee925864f3d8ffcf316d4f95e00.efoo": {
+      "sha256": "15996d15a8bf883dceaa60885ae9db5128b505481fe9aeacc4a4a013e70a44eb",
+      "bytes": 4258
+    },
+    "FOOTPRINT/cc4c2adb009b41c9b54794b6a1b0da05.efoo": {
+      "sha256": "d5cf1b41d12ad3e6bb7ccddbe3e8748422f269c6678f84deec129bd309b373a0",
+      "bytes": 3210
+    },
+    "FOOTPRINT/cd1048b715704363a29af62dff3e951f.efoo": {
+      "sha256": "a1cd2ff58c99e33e34aedd84efd69d1f71f2a3b1e81b1b78438535c9999db468",
+      "bytes": 14324
+    },
+    "FOOTPRINT/d8c546dea21a4671bbed3cf9c80a6fd6.efoo": {
+      "sha256": "86f4365fad398febe6c3c3d79e2c479a2bb2348b3c11c00baa6535d97d759b82",
+      "bytes": 4019
+    },
+    "FOOTPRINT/f10f703879d045a7ae341c616310486c.efoo": {
+      "sha256": "e4c206e7436f5600ef86d5a7b71e2b3b36b2629efc5497a5a0904e5fdadd8ed6",
+      "bytes": 6633
+    },
+    "FOOTPRINT/f888e352a6ae48899dbe286eefb17180.efoo": {
+      "sha256": "e4a269239bde83dac665e271b270e09d54dd9add55445f20cd8a43fdcdb15e06",
+      "bytes": 2768
+    },
+    "PCB/713c046c188c4dfdba1eb61d39f295e0.epcb": {
+      "sha256": "273716068c7ec3ef1803ac87568614b3d23bf9eae125dab233beee9834126b14",
+      "bytes": 96768
+    },
+    "SHEET/32ea5bf5025146298bdf4ae8c1b15e54/1.esch": {
+      "sha256": "64795246d09a63649e6ab3cdfc97acf28e0b2eefc1f0507cbcbce4fddce84e4e",
+      "bytes": 46465
+    },
+    "SYMBOL/026cbb84ebde422086cc0df25c85d375.esym": {
+      "sha256": "bd1a207b1b6462e84de5ae5e1b83f10f6987282b39c5be28796c38eaedf01ea7",
+      "bytes": 4212
+    },
+    "SYMBOL/02ebc62b6f904169aed5807dcd14b386.esym": {
+      "sha256": "b410f14b51e255ddadcc7f7dec775de0dd1f7d33345e53d274980655e920da06",
+      "bytes": 1033
+    },
+    "SYMBOL/118cc434be644b928fb92d98fbd71212.esym": {
+      "sha256": "1275be3c00b22a75d4d66cc76f3dfad0da342e5bb8d39aa3c3e49fb314f3b456",
+      "bytes": 11924
+    },
+    "SYMBOL/12b774a05f344076a1d978c3069ba29d.esym": {
+      "sha256": "d27550be8da11c4727d063705cbaaa3c7882127deddf54c9f0a99a55aa7f04ed",
+      "bytes": 1017
+    },
+    "SYMBOL/12dcf5f5750c44b79a3c74ca331b7dd2.esym": {
+      "sha256": "6256bc8c173d834f0694b57ef618041cb6b54baca3058f9c83dfbbb4e85e9a31",
+      "bytes": 1033
+    },
+    "SYMBOL/1350609587bb4323a6b53c4f725efded.esym": {
+      "sha256": "3e0d3d90dd52f111e98dfa2d176e892ae6df75c0e570f3229fac145e8fbe5cfe",
+      "bytes": 1206
+    },
+    "SYMBOL/1821b273808740f5a5d8e1513d803721.esym": {
+      "sha256": "10db2f0ad452aae5961059098712f5c63d32e80640715d1786f57c70f8860a09",
+      "bytes": 6161
+    },
+    "SYMBOL/1a0265450dd84e06bc5cfffab52a3965.esym": {
+      "sha256": "7c0314054c2476599a73a8d8828e03cc2e15834bfdbfeee057a85e54ad1fa4b2",
+      "bytes": 1616
+    },
+    "SYMBOL/20e73b2912314aa395d75b3fe0af2e4b.esym": {
+      "sha256": "070a597c0a044872f1570b185e6c773366e7f1df5b13eb30555b4790b1768c1f",
+      "bytes": 3726
+    },
+    "SYMBOL/222d807c8e5844b681449b78570db6c2.esym": {
+      "sha256": "8bcd7c2efed2e0dfa1ecea6cbdf6db4d97af066560a840fde9f3b37528ba4fe5",
+      "bytes": 1735
+    },
+    "SYMBOL/2233cb14b84e4496bec0866d3b733b05.esym": {
+      "sha256": "5f92792a574e2fda77baa64f3c056c4833cf5475dcd1d78796551aadc87c9d77",
+      "bytes": 1101
+    },
+    "SYMBOL/241494d56d814102a77f8b0b76c68351.esym": {
+      "sha256": "eaaccbd2104af2166cba1224ec8b9719ca54edda630f4bdfd239681e0f8db6c2",
+      "bytes": 6904
+    },
+    "SYMBOL/318ea46c3e5e40ef9a83e2ece9154336.esym": {
+      "sha256": "d0e8058bbda535d34b6e7a384ac95065ccd8d5f1478ea58e039098be1fbb7682",
+      "bytes": 847
+    },
+    "SYMBOL/3f1133f520354e6f9180a15dac05a837.esym": {
+      "sha256": "5681a235c588f4e97f3f5bc7b8a3a4b73cc4c43bdd70d2b28e8edf6557207fab",
+      "bytes": 1628
+    },
+    "SYMBOL/4128d35b1a1f4740ad2b75a01e5c0502.esym": {
+      "sha256": "09e56915920511338a7a35a76d00543c80bd21d10dafaea39ffb553d3b93c04e",
+      "bytes": 11003
+    },
+    "SYMBOL/4372c4a36e934b2291edc8494baa40f7.esym": {
+      "sha256": "6ef98ea11bd84251b5ba4244ae66f93af597f1002c67019460c65d5392b69728",
+      "bytes": 1617
+    },
+    "SYMBOL/45ba555d48664d18a712ce9cd10b1adf.esym": {
+      "sha256": "53460021fde24267337d12c75afc9000920a101fc25f776f735431814fc9e28a",
+      "bytes": 852
+    },
+    "SYMBOL/538fec445efe4ab982d2586b21651f7e.esym": {
+      "sha256": "2de9144b0c6ec39786d206f72203082677da037bf2470035ebbb377d978b4989",
+      "bytes": 2160
+    },
+    "SYMBOL/5a7291c0180f45faa4731d1a9900cbfe.esym": {
+      "sha256": "1e0af4b1e00cb8ebdb7fe72464b86731c3e81caf31568cb2a2d7bbbd43aebfcb",
+      "bytes": 1130
+    },
+    "SYMBOL/5c32c851e2a54131807babab68d80748.esym": {
+      "sha256": "b62dc89bec4862f89f87635cdc3614c6108875c0cdd23c568213cc48d5a95ee5",
+      "bytes": 1584
+    },
+    "SYMBOL/61047a229408450983c51f3c7fffad25.esym": {
+      "sha256": "1e2bd7fec64baa8b32b3477a6024c6bbf496278a9904f84294486d8bf744f4a4",
+      "bytes": 4232
+    },
+    "SYMBOL/655cb53fd0274062953d65087ddae6fb.esym": {
+      "sha256": "c9c2b993dd0790b5032d0cb4f254127431c52cbfc7f6ac3f0664f27044ee7127",
+      "bytes": 1033
+    },
+    "SYMBOL/66a9e32f94824bd6b55dcf513975cbf5.esym": {
+      "sha256": "e8701e2f1b591bd54b4cf7e46a82967f3d099511dca65f7066c7a0828815472f",
+      "bytes": 1033
+    },
+    "SYMBOL/66caf48994c4422195c79b5f587a48ff.esym": {
+      "sha256": "46cfd8e880e9647e80e17b0c31bed6bef3dbcfee1e42b520f91b274b96089793",
+      "bytes": 1642
+    },
+    "SYMBOL/6fa45fd494a94d77a4392c6b6989ea2c.esym": {
+      "sha256": "403a99eb85da6a447d8a6ba6e01741bffb34338112134384ba890d8c4c8b30a7",
+      "bytes": 2160
+    },
+    "SYMBOL/7676aead2dfc4e839020fd4f7b51e58b.esym": {
+      "sha256": "32147b77232c1d206d78ff03f0e408a8579b5569d2fbf8042814fc18a57e3a7c",
+      "bytes": 10375
+    },
+    "SYMBOL/78d87ac9695346b9a41db136bc5be3d8.esym": {
+      "sha256": "3de3bbca0f689bf2eb408285c82c9cd25251b0840d380fd41bfacc31cc96a47f",
+      "bytes": 4230
+    },
+    "SYMBOL/796daf2aae5649c48b006c63f233621f.esym": {
+      "sha256": "b87806dd8c9cc614494d82fff5744206e48f579307d974f39aaaf995fe440a94",
+      "bytes": 1872
+    },
+    "SYMBOL/853275ae7437440bb1b02f78486fc6b5.esym": {
+      "sha256": "8480d839ebffa2cd189784c05ba2c538e0434e043e0bb7e3675183b6ffa25e6e",
+      "bytes": 3136
+    },
+    "SYMBOL/885c9c4b153247dfac0539575218a122.esym": {
+      "sha256": "9d30c7f04a4662fa8c2203577ba4d2d304ed4a0e62b27de3f12eeede437d1561",
+      "bytes": 4226
+    },
+    "SYMBOL/8b6d991d2f9e4b4b8d49e3ff7833cb75.esym": {
+      "sha256": "ea9e00a32ec3f1fc55bbe36b27f4cd3abd3e8d7004e6d6d1516e5ca07a8efb24",
+      "bytes": 1168
+    },
+    "SYMBOL/966cd264e48341b88d6c10c39a968ec2.esym": {
+      "sha256": "f7280a8ab4200faf760fd6a9a2748c1f48e8b6bc096a7b3fd258ba117a8a4262",
+      "bytes": 13751
+    },
+    "SYMBOL/a21dd8ab47394e47bde57569d5448f46.esym": {
+      "sha256": "066099d471dc0706ab7d24404b6c5f2f96d06a6864ad037d303800adb821d035",
+      "bytes": 6144
+    },
+    "SYMBOL/acd6bdf58e1140efa48a0596549d65a3.esym": {
+      "sha256": "868314fc52f965129bbf2d2683f46212b4ed582c147cdd1e18f2884ec5438acf",
+      "bytes": 943
+    },
+    "SYMBOL/b29f21eb6f6a413aae1223ce089a6cec.esym": {
+      "sha256": "44908d492d8faac3387a6af8a02e3a1ff560359bca20f1795cd470dea2dfedd4",
+      "bytes": 1172
+    },
+    "SYMBOL/b887a6bac6424d33a5bc5c7a9542d6af.esym": {
+      "sha256": "8d0d52c415d52ec0ea015143cba96154aefc131df14931c27153acab5e62d54c",
+      "bytes": 4795
+    },
+    "SYMBOL/bc4997a8b86647b589dd437950e0e24e.esym": {
+      "sha256": "6594eb4070181d4d26f3a339840f1ba19dd3c65afadc9452ca086f41461b077b",
+      "bytes": 1146
+    },
+    "SYMBOL/c2041b1999d4464496dee4a4afae6b3d.esym": {
+      "sha256": "54cb5cda331015203fbd689af3b777680dc7ded6587d2f736b90588c6979e10a",
+      "bytes": 837
+    },
+    "SYMBOL/c34556632d154d61b09400ee4790e647.esym": {
+      "sha256": "66b999bf782c1db94460331af1e2d84757b585d0ce653a95488f1c2fb89abaf8",
+      "bytes": 1086
+    },
+    "SYMBOL/c4ae71d45ffd408ebdff9028df326022.esym": {
+      "sha256": "5584a266b97290bcf9eb11b127d5a7c4c9de0165216b158f4e0a25e6ecf596b5",
+      "bytes": 4736
+    },
+    "SYMBOL/c4c807671905408e80e5bb01d7fce87f.esym": {
+      "sha256": "901781ade33158b68f24c3292337a96f45fc1742d13349a385f5ae96898666dc",
+      "bytes": 1142
+    },
+    "SYMBOL/c78af532c58c4969842c31a1d0b25d8f.esym": {
+      "sha256": "848c72666b46a001aef95339b5abca896feaaef06388a8de93d26e1cc438509b",
+      "bytes": 4813
+    },
+    "SYMBOL/c7cdbaa4cb0645ebb8e2c7cda3bd57a3.esym": {
+      "sha256": "e3fb7a5ccdb4ad1011bd61ee086b6e19c9b40f423b3dc35de4b807174574492c",
+      "bytes": 1658
+    },
+    "SYMBOL/cb1e54f8d85d43b6a3d6aee27b3c21d8.esym": {
+      "sha256": "c2945845487cdb657d033bbdf02ef4227c081ea216c395a5e61acde5c74e6cab",
+      "bytes": 1603
+    },
+    "SYMBOL/d248b2ac619c458183fa65d6fd1f1457.esym": {
+      "sha256": "d56e8ce92fad9f87411741e8a65c536057a2759e00dd4f59595b0e610e8eed7e",
+      "bytes": 1254
+    },
+    "SYMBOL/d868f23eb786438986e62f51787743d0.esym": {
+      "sha256": "1339954f07ce12b4101c79eb283a1a945395d52b7312a2a0590bd9dccabdd5af",
+      "bytes": 2077
+    },
+    "SYMBOL/d99162697439489c855a311dc854d302.esym": {
+      "sha256": "f5e1d1c24e85d7afd7e257f85c5f3dd11a30ca87c3cec72487cc7e8c2f4c5c82",
+      "bytes": 6160
+    },
+    "SYMBOL/e5fb88583eea4b5cb984b6283640fe6b.esym": {
+      "sha256": "484996216a4017c3a00510c44e304552472c17b24d456418bef8d91de68aec1e",
+      "bytes": 1598
+    },
+    "SYMBOL/eca3a25997dc438085a3f9f4eb52b00f.esym": {
+      "sha256": "07c2728689a8fa9780d4a73431d70af766bcab634ba95f9fe54938de2b15e299",
+      "bytes": 4751
+    },
+    "SYMBOL/f4b1da774b26456a8065ed5def56a6aa.esym": {
+      "sha256": "149f9892f0c3e784da708aee8170f144229b62248ecd6214c8cedb23161b1c79",
+      "bytes": 5021
+    },
+    "SYMBOL/f5c33c4eabbc41639aee13efdd454afa.esym": {
+      "sha256": "7aa862d9ddc0d194e41397e70c6112348b0e2d3ab8933d52ad02c943ffc8489e",
+      "bytes": 4097
+    },
+    "SYMBOL/fe4f5c7658f94946a80a2dd0b1743dd9.esym": {
+      "sha256": "57d58bbf9e48b0df4c49acf1ae3a18a5446e37722a21ae235e2eb6414db9a770",
+      "bytes": 1617
+    }
+  },
+  "locked_hashes": {
+    "README.md": {
+      "sha256": "1eb49244cefaced555604b9850d5ad7a21dbbfecb6e92c08cdf86b71dbff3bd5",
+      "bytes": 6000
+    },
+    "firmware/main/config.h": {
+      "sha256": "66b651975cdd25d9f928202a4e8f8721f99c683426951e0c2caa5c85df8eb33f",
+      "bytes": 13056
+    },
+    "ki-kad/1.9inch_Touch_LCD_Schematic.pdf": {
+      "sha256": "eab08764f8cde1ac4af9146e74b2c2f7790b683b9626325fe78f456bf2acd9fb",
+      "bytes": 208563
+    },
+    "ki-kad/pcb/first-version-Esp32_Based_PCB_Design/Project Source File Easyeda/ProPrj_Murilofrier_PCB_2026-03-23.epro": {
+      "sha256": "98c8729bc800721652101c3398a34991ad3b166f8cb5e00a1f6516a3a4726a7a",
+      "bytes": 139968
+    },
+    "ki-kad/pcb/2nd-version/ESP32_DISP_PCB/Source File/ProPrj_Murilofrier_PCB_2026-03-23.epro": {
+      "sha256": "69b000ff5835c21125d890938fb19528c9afc02c4cb020b5d6e882436c3f6855",
+      "bytes": 139382
+    },
+    "ki-kad/pcb/3rd - Updated_PCB_FIle/ProPrj_Murilofrier_PCB_2026-03-29.epro": {
+      "sha256": "b084ea20f2962386ef320e88289b239b81f86275865908160eaccf2ec5c9033c",
+      "bytes": 172264
+    }
+  },
+  "docs": {
+    "README.md": {
+      "sha256": "cecfd592c1e6cd24b3fe3236678e172a05e428ae96c79e0a072c1d93e03cbe14",
+      "bytes": 7122
+    },
+    "artifacts/connector-pinout.json": {
+      "sha256": "27913ba5a4e6ac33d9e0bdaa4c628fe5354d1f120a7efc500ed6a7fa3a5818f0",
+      "bytes": 10093
+    },
+    "artifacts/connector-pinout.md": {
+      "sha256": "9bb438fe80a1da54155652bfe557a493da96a208a0c033137918f1cf1d3b82f1",
+      "bytes": 1876
+    },
+    "artifacts/MANIFEST.json": {
+      "sha256": "7ce01663b4411bbbc7638174c73a65d4f9f8ce4bbd0069ad8dd4ea101743aab5",
+      "bytes": 29681
+    },
+    "artifacts/README.md": {
+      "sha256": "bfb9d78fa4b3fbeb3f57fd332b5da7b1b3871b3db7d8cfb9102c12fe16120433",
+      "bytes": 1820
+    },
+    "artifacts/sch_conn.out.txt": {
+      "sha256": "142c75aef136d8be5f6908ab3da6c964011f2ba51317ee67dbb4e62e3c40bbf3",
+      "bytes": 12229
+    },
+    "artifacts/sch_full.out.txt": {
+      "sha256": "8f25bac023f511e3090ac1f193a331b6f65d54963f94c48b7f80932f6daa19e4",
+      "bytes": 9241
+    },
+    "artifacts/sch_j1.out.txt": {
+      "sha256": "066909116214a5e4b39f32a6969aa3214ea4b917ec2cbc0302bb4044edfeec95",
+      "bytes": 6271
+    },
+    "artifacts/sch_words.out.txt": {
+      "sha256": "c2bf1b435d637ad672359836f491d5ddd552d6a435f5fca67d932ce99e97efeb",
+      "bytes": 10611
+    },
+    "tools/all_revs.py": {
+      "sha256": "1b85d701e64080c9936297bfc2ef332c9a6ac8ecfdd0bf5538830264cf744c3f",
+      "bytes": 2710
+    },
+    "tools/board_final.py": {
+      "sha256": "e53122c8710982d99d4727dbcbde6debef918a79d82ad098cdc09e3ab35edd60",
+      "bytes": 2833
+    },
+    "tools/board_probe.py": {
+      "sha256": "14bf12d611b013f206558e02dfbc288762a0eade03cf046075484d54586c217c",
+      "bytes": 1333
+    },
+    "tools/board_probe2.py": {
+      "sha256": "3219c634af8ea490ba4c475dc447962fba95e2eab7be612e62305efba48e52a2",
+      "bytes": 1425
+    },
+    "tools/board_probe3.py": {
+      "sha256": "2acfeb44a4987370d703b1a95bc0addca168d8b7d51ef8d1fd20e284037fa169",
+      "bytes": 2289
+    },
+    "tools/board_probe4.py": {
+      "sha256": "98c0826d89f8011ddfec7f52173f71fdee57979278f9a79b0d18506a80385069",
+      "bytes": 1862
+    },
+    "tools/board_probe5.py": {
+      "sha256": "2d9634604fe9ff21716c33a93a63d2c7c529d810a312cac4a86fa6880cdb78ca",
+      "bytes": 1198
+    },
+    "tools/board_probe6.py": {
+      "sha256": "d49ad2fe4d0950dead084b998a443a6fbc0f6997bc77125b9fe9361d38d83dd8",
+      "bytes": 1489
+    },
+    "tools/cache_artifacts.py": {
+      "sha256": "706eeab7e86b37ecac59e1e4d580496ed9c9286245368ee8d4ae0b6fe6cc69e0",
+      "bytes": 6421
+    },
+    "tools/ci_patch.py": {
+      "sha256": "1373bc37ddf8076efd4aaa55ae398c8aeb86e3bfd2340edc78b8fad8272037a0",
+      "bytes": 8073
+    },
+    "tools/config_h_diff.py": {
+      "sha256": "e8936a80c8103613781dc065ad9ce4e8b96046b71eac0f934bd5820ad23bd66e",
+      "bytes": 3875
+    },
+    "tools/config_h_patch_v3.py": {
+      "sha256": "053f25cf77f7306c106e624c1ac5ba0a5140668553aaa0a892f4911c15590b79",
+      "bytes": 5324
+    },
+    "tools/config_h_patch_v4.py": {
+      "sha256": "ae4cce7613f5fc37bf5a410bb1b11c16a4e5a525c594266860270d261823a039",
+      "bytes": 2721
+    },
+    "tools/decoded_connectors.py": {
+      "sha256": "7035cb65242a60b91a4500205a05df56326991b58aede12ebe323339ab2e09cf",
+      "bytes": 3325
+    },
+    "tools/netmap_verify.py": {
+      "sha256": "90d2839f01e8f4659c9cce426f2812fbcdf84747110524a349259722a75f7e14",
+      "bytes": 2686
+    },
+    "tools/provenance.py": {
+      "sha256": "b94428063012a629a002d4eb9b2f316e4e72944e6a4acd18fe07da53e985ede5",
+      "bytes": 1841
+    },
+    "tools/raw_netdump.py": {
+      "sha256": "a459e80501f950812089ca88663eff9ac24c681f1776db5aa6b65e13c556a9d3",
+      "bytes": 1008
+    },
+    "tools/render_sch.py": {
+      "sha256": "9a4c33139ce65154c054f19894a593bd4c051258c98713784bbf6fc03c537507",
+      "bytes": 404
+    },
+    "tools/sch_conn.py": {
+      "sha256": "36a35c1a8e5d68fb28f608bb4a8246a3518fcb0d154f1cb651759336e2edfeb2",
+      "bytes": 768
+    },
+    "tools/sch_crops.py": {
+      "sha256": "94a20ac6e56ed6fe105fa6fce60ef982984cf848dbad14cf66d442bcae883f73",
+      "bytes": 521
+    },
+    "tools/sch_full.py": {
+      "sha256": "3a0efba75b84282f1112ad66d9639f4c3cafda9f691f05e040dfa543a3b0ae12",
+      "bytes": 1127
+    },
+    "tools/sch_j1.py": {
+      "sha256": "df7c777b2e2154866e3ed5e3370719a05fcafd58b3ac99b211dc7e774614c3f2",
+      "bytes": 969
+    },
+    "tools/sch_words.py": {
+      "sha256": "0c427fdbc99077f55c40bbd4ac096409c4d338e955ec64e73f039a2ec59e6939",
+      "bytes": 921
+    },
+    "tools/screen_pins_final.py": {
+      "sha256": "d9c309417964e84aa4a912405f3a70a97dc72f6f99101447e75717c09016d1e5",
+      "bytes": 3160
+    },
+    "tools/sym_pins.py": {
+      "sha256": "c003d38753d79da122e06d55ae066f0b2b8b1645dff7e41c655ddbaa405a7c32",
+      "bytes": 866
+    },
+    "tools/u1_full_pinmap.py": {
+      "sha256": "982d207b8189d00eaedb9e2e7da71b93817f67e02e51918d3fc6427ab5da1fdc",
+      "bytes": 986
+    }
+  }
+}

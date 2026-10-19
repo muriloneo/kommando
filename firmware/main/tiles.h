@@ -30,7 +30,7 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 #include "config.h"
-#include "ui_state.h"   /* ui_tile_t, s_tiles[] */
+#include "ui/ui_state.h"   /* ui_tile_t, s_tiles[] */
 
 /* ---- Internal event types for the touch→Zigbee queue ---- */
 typedef enum {

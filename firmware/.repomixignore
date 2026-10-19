@@ -1,0 +1,14 @@
+build/
+managed_components/
+.dependencies.lock
+sdkconfig
+sdkconfig.old
+.vscode/
+.git/
+node_modules/
+*.bin
+*.elf
+*.map
+*.log
+.ai/repo.xml
+repo-context.md

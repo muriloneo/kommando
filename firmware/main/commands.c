@@ -21,9 +21,9 @@
 #include "commands_parse.h"
 #include "commands_dedupe.h"
 #include "tiles.h"
-#include "ui_state.h"
+#include "ui/ui_state.h"
 #include "backlight.h"
-#include "ui_panel.h"
+#include "ui/ui_panel.h"
 #include "config.h"
 
 #include <string.h>

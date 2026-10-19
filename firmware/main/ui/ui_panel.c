@@ -286,6 +286,42 @@ lv_color_t ui_panel_get_on_color(void)
     return lv_color_make(COLOR_TILE_ON);
 }
 
+void ui_panel_apply_tile(int tile_id, bool configured, const char *name,
+                         bool dimmable, bool state, uint8_t level)
+{
+    if (tile_id < 0 || tile_id >= MAX_TILES) return;
+    ui_tile_t *t = &s_tiles[tile_id];
+
+    /* --- Update logical state --- */
+    t->configured = configured;
+    t->dimmable   = dimmable;
+    t->state      = state;
+    t->level      = level;
+    if (name && configured) {
+        strncpy(t->name, name, TILE_NAME_MAX_LEN - 1);
+        t->name[TILE_NAME_MAX_LEN - 1] = '\0';
+    }
+
+    /* --- Paint LVGL objects (only if ui_panel_build() has run) --- */
+    if (!t->tile) return;
+
+    lv_color_t bg;
+    if (!configured) {
+        bg = lv_color_make(COLOR_TILE_EMPTY);
+    } else if (state) {
+        bg = ui_panel_get_on_color();
+    } else {
+        bg = lv_color_make(COLOR_TILE_OFF);
+    }
+    lv_obj_set_style_bg_color(t->tile, bg, LV_PART_MAIN);
+
+    if (t->name_label) {
+        lv_label_set_text(t->name_label, (configured && name) ? name : "Empty");
+    }
+
+    ui_panel_update_dimmer_badge(tile_id, dimmable);
+}
+
 void ui_panel_set_night_mode(bool night_on)
 {
     s_night_mode = night_on;
@@ -362,6 +398,10 @@ void ui_panel_update_dimmer_badge(int tile_id, bool dimmable)
 void ui_panel_build(lv_display_t *disp)
 {
     (void)disp;   /* Reserved for multi-display use */
+
+    /* Initialise theme styles on first build */
+    ui_theme_init();
+
     UI_LOGI(TAG, "Building panel UI...");
 
     lv_obj_t *scr = lv_screen_active();
@@ -370,33 +410,18 @@ void ui_panel_build(lv_display_t *disp)
     lv_obj_add_event_cb(scr, global_touch_cb, LV_EVENT_ALL, NULL);
 
     /* Screen background */
-    lv_obj_set_style_bg_color(scr, lv_color_make(COLOR_BG), LV_PART_MAIN);
-    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    ui_theme_apply_screen(scr);
 
     /* ---- Header bar ---- */
     lv_obj_t *hdr = lv_obj_create(scr);
-    lv_obj_set_size(hdr, LCD_H_RES, HEADER_HEIGHT_PX);
-    lv_obj_align(hdr, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_radius(hdr, 0, LV_PART_MAIN);
-    lv_obj_set_style_border_width(hdr, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(hdr, lv_color_make(COLOR_HEADER_BG), LV_PART_MAIN);
-    lv_obj_clear_flag(hdr, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_add_flag(hdr, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(hdr, header_click_cb, LV_EVENT_CLICKED, NULL);
-
     lv_obj_t *hdr_lbl = lv_label_create(hdr);
     lv_label_set_text(hdr_lbl, LV_SYMBOL_HOME "  Kommando");
-    lv_obj_set_style_text_color(hdr_lbl, lv_color_make(COLOR_HEADER_TEXT), LV_PART_MAIN);
-    lv_obj_set_style_text_font(hdr_lbl, &lv_font_montserrat_14, LV_PART_MAIN);
-    lv_obj_center(hdr_lbl);
+    lv_obj_add_event_cb(hdr, header_click_cb, LV_EVENT_CLICKED, NULL);
+    ui_theme_apply_header(hdr, hdr_lbl);
 
     /* ---- Grid container ---- */
     lv_obj_t *grid = lv_obj_create(scr);
-    lv_obj_set_size(grid, LCD_H_RES, LCD_V_RES - HEADER_HEIGHT_PX);
-    lv_obj_align(grid, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_border_width(grid, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, LV_PART_MAIN);
-    lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
+    ui_theme_apply_grid(grid);
 
     /* 2-column, 3-row equal-weight grid */
     static lv_coord_t col_dsc[] = {
@@ -418,45 +443,24 @@ void ui_panel_build(lv_display_t *disp)
             LV_GRID_ALIGN_STRETCH, col, 1,
             LV_GRID_ALIGN_STRETCH, row, 1);
 
-        lv_obj_set_style_radius(tile, TILE_CORNER_RADIUS, LV_PART_MAIN);
-        lv_obj_set_style_border_width(tile, 0, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(tile, lv_color_make(COLOR_TILE_EMPTY), LV_PART_MAIN);
-        lv_obj_clear_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_add_flag(tile, LV_OBJ_FLAG_CLICKABLE);
+        ui_theme_apply_tile_base(tile);
 
         /* Icon — centred slightly above mid */
         lv_obj_t *icon = lv_label_create(tile);
         lv_label_set_text(icon, LV_SYMBOL_POWER);
-        lv_obj_set_style_text_font(icon, LV_FONT_DEFAULT, LV_PART_MAIN);
-        lv_obj_set_style_text_color(icon, lv_color_make(COLOR_TILE_UNCFG_TEXT), LV_PART_MAIN);
-        lv_obj_align(icon, LV_ALIGN_CENTER, 0, TILE_ICON_OFFSET_Y);
 
         /* Name — single-line, centred below icon, truncated on overflow */
         lv_obj_t *name = lv_label_create(tile);
         lv_label_set_text(name, "Empty");
-        lv_obj_set_style_text_font(name, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_set_style_text_color(name, lv_color_white(), LV_PART_MAIN);
-        lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN);
-        lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(name, (LCD_H_RES / TILE_GRID_COLS) - 20);
-        lv_obj_align(name, LV_ALIGN_CENTER, 0, TILE_NAME_OFFSET_Y);
 
         /* State label — hidden by default */
         lv_obj_t *state = lv_label_create(tile);
         lv_label_set_text(state, "");
-        lv_obj_set_style_text_font(state, &lv_font_montserrat_14, LV_PART_MAIN);
-        lv_obj_set_style_text_color(state, lv_color_make(COLOR_STATE_LABEL), LV_PART_MAIN);
-        lv_obj_add_flag(state, LV_OBJ_FLAG_HIDDEN);
 
         /* Dimmer badge — small orange dot at top-right */
         lv_obj_t *badge = lv_obj_create(tile);
-        lv_obj_set_size(badge, UI_BADGE_SIZE, UI_BADGE_SIZE);
-        lv_obj_align(badge, LV_ALIGN_TOP_RIGHT, -4, 4);
-        lv_obj_set_style_radius(badge, UI_BADGE_RADIUS, LV_PART_MAIN);
-        lv_obj_set_style_border_width(badge, 0, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(badge, lv_color_make(COLOR_BADGE_DIMMABLE), LV_PART_MAIN);
-        lv_obj_add_flag(badge, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(badge, LV_OBJ_FLAG_CLICKABLE);
+
+        ui_theme_apply_tile_children(icon, name, state, badge);
 
         /* Populate tile state */
         s_tiles[i].id           = i;
@@ -479,67 +483,34 @@ void ui_panel_build(lv_display_t *disp)
 
     /* ---- Connection overlay (shown until Zigbee joins) ----------------- */
     s_conn_overlay = lv_obj_create(scr);
-    lv_obj_set_size(s_conn_overlay, LCD_H_RES, LCD_V_RES);
-    lv_obj_align(s_conn_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(s_conn_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_conn_overlay, UI_OVERLAY_OPA_CONN, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_conn_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_conn_overlay, 0, LV_PART_MAIN);
-    lv_obj_clear_flag(s_conn_overlay, LV_OBJ_FLAG_SCROLLABLE);
-
     s_conn_spinner = lv_spinner_create(s_conn_overlay);
     lv_obj_set_size(s_conn_spinner, UI_CONN_SPINNER_SIZE, UI_CONN_SPINNER_SIZE);
     lv_obj_align(s_conn_spinner, LV_ALIGN_CENTER, 0, -20);
 
     s_conn_label = lv_label_create(s_conn_overlay);
     lv_label_set_text(s_conn_label, "Connecting to Zigbee...");
-    lv_obj_set_style_text_color(s_conn_label, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_conn_label, &lv_font_montserrat_14, LV_PART_MAIN);
-    lv_obj_align(s_conn_label, LV_ALIGN_CENTER, 0, 22);
+
+    ui_theme_apply_conn_overlay(s_conn_overlay, s_conn_label);
 
     /* ---- Dimmer overlay (hidden; opened by long-press) ----------------- */
     s_dimmer_overlay = lv_obj_create(scr);
-    lv_obj_set_size(s_dimmer_overlay, LCD_H_RES, LCD_V_RES);
-    lv_obj_align(s_dimmer_overlay, LV_ALIGN_CENTER, 0, 0);
-    lv_obj_set_style_bg_color(s_dimmer_overlay, lv_color_black(), LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(s_dimmer_overlay, UI_OVERLAY_OPA_DIM, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_dimmer_overlay, 0, LV_PART_MAIN);
-    lv_obj_set_style_radius(s_dimmer_overlay, 0, LV_PART_MAIN);
-    lv_obj_add_flag(s_dimmer_overlay, LV_OBJ_FLAG_HIDDEN);
+    ui_theme_apply_dimmer_overlay(s_dimmer_overlay);
     lv_obj_add_event_cb(s_dimmer_overlay, dimmer_overlay_click_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *card = lv_obj_create(s_dimmer_overlay);
-    lv_obj_set_size(card, UI_DIMMER_CARD_W, UI_DIMMER_CARD_H);
-    lv_obj_center(card);
-    lv_obj_set_style_radius(card, UI_DIMMER_CARD_RADIUS, LV_PART_MAIN);
-    lv_obj_set_style_border_width(card, 0, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(card, lv_color_make(COLOR_DIMMER_CARD_BG), LV_PART_MAIN);
 
     s_dimmer_title = lv_label_create(card);
     lv_label_set_text(s_dimmer_title, "Dimmer");
-    lv_obj_set_style_text_color(s_dimmer_title, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_dimmer_title, &lv_font_montserrat_14, LV_PART_MAIN);
-    lv_obj_align(s_dimmer_title, LV_ALIGN_TOP_MID, 0, 12);
 
     s_dimmer_slider = lv_slider_create(card);
-    lv_obj_set_size(s_dimmer_slider, UI_SLIDER_W, UI_SLIDER_H);
-    lv_obj_align(s_dimmer_slider, LV_ALIGN_CENTER, -40, 10);
     lv_slider_set_range(s_dimmer_slider, 0, 100);
     lv_slider_set_value(s_dimmer_slider, 0, LV_ANIM_OFF);
     lv_obj_add_event_cb(s_dimmer_slider, dimmer_slider_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    /* Slider styling */
-    lv_obj_set_style_radius(s_dimmer_slider, 8, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(COLOR_SLIDER_TRACK), LV_PART_MAIN);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_make(COLOR_TILE_ON),      LV_PART_INDICATOR);
-    lv_obj_set_style_bg_color(s_dimmer_slider, lv_color_white(),                  LV_PART_KNOB);
-    lv_obj_set_style_pad_all(s_dimmer_slider, 2, LV_PART_MAIN);
-
     s_dimmer_value = lv_label_create(card);
     lv_label_set_text(s_dimmer_value, "0%");
-    lv_obj_set_style_text_color(s_dimmer_value, lv_color_white(), LV_PART_MAIN);
-    lv_obj_set_style_text_font(s_dimmer_value, &lv_font_montserrat_24, LV_PART_MAIN);
-    lv_obj_align(s_dimmer_value, LV_ALIGN_CENTER, 40, 12);
+
+    ui_theme_apply_dimmer_card(card, s_dimmer_title, s_dimmer_slider, s_dimmer_value);
 
     UI_LOGI(TAG, "Panel UI ready — %d tiles", MAX_TILES);
 }

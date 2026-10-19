@@ -31,7 +31,7 @@
  * include config.h, while also letting the simulator include ui_config.h
  * directly without pulling in any ESP32 SDK headers.
  */
-#include "ui_config.h"
+#include "ui/ui_config.h"
 
 /* Fallbacks for environments where Kconfig symbols are not generated yet. */
 #ifndef CONFIG_KOMMANDO_OTA_IMAGE_TYPE
@@ -61,43 +61,47 @@
 /* ============================================================
    HARDWARE PINS — LCD (ST7789V2, SPI)
    ──────────────────────────────────────────────────────────────
-   FPC Pin   Wire colour   GPIO   Function
-   ──────    ────────────  ────   ────────
-     3       Orange        7      SPI MOSI
-     4       Green         6      SPI CLK
-     5       Blue         10      SPI CS
-     6       Purple       11      Data / Command (DC)
-     7       Gray          3      LCD Reset
-     8       Orange        2      Backlight (LEDC PWM)
+   FPC pad   Signal    ESP32-C6 GPIO   Function
+   ───────   ───────   ─────────────   ────────
+     5       MOSI      GPIO7           SPI data out (C6 pin role: FSPID)
+     4       SCLK      GPIO6           SPI clock    (C6 pin role: FSPICLK)
+     9       LCD_CS    GPIO3           Chip select
+     7       LCD_DC    GPIO10          Data / Command
+     8       LCD_RST   GPIO11          Panel reset
+     2       LCD_BL    GPIO2           Backlight (LEDC PWM)
+   NOTE: U4 net labels on pads 4/5 are swapped (net "LCD_DIN" sits on the SCLK
+   contact, "LCD_CLK" on MOSI). The copper decides, not the label.
    ============================================================ */
-#define PIN_LCD_MOSI     GPIO_NUM_7   /* FPC 3  (Orange)  — SPI MOSI           */
-#define PIN_LCD_CLK      GPIO_NUM_6   /* FPC 4  (Green)   — SPI clock          */
-#define PIN_LCD_CS       GPIO_NUM_10  /* FPC 5  (Blue)    — SPI chip select    */
-#define PIN_LCD_DC       GPIO_NUM_11  /* FPC 6  (Purple)  — Data/command       */
-#define PIN_LCD_RST      GPIO_NUM_3   /* FPC 7  (Gray)    — Panel reset        */
-#define PIN_LCD_BL       GPIO_NUM_2   /* FPC 8  (Orange)  — Backlight (PWM)    */
+#define PIN_LCD_MOSI     GPIO_NUM_7   /* U4/FPC pad 5 — SPI data out (FSPID)   */
+#define PIN_LCD_CLK      GPIO_NUM_6   /* U4/FPC pad 4 — SPI clock    (FSPICLK) */
+#define PIN_LCD_CS       GPIO_NUM_3   /* U4/FPC pad 9 — SPI chip select        */
+#define PIN_LCD_DC       GPIO_NUM_10  /* U4/FPC pad 7 — Data/command           */
+#define PIN_LCD_RST      GPIO_NUM_11  /* U4/FPC pad 8 — Panel reset            */
+#define PIN_LCD_BL       GPIO_NUM_2   /* U4/FPC pad 2 — Backlight (PWM)        */
 
 /* ============================================================
    HARDWARE PINS — TOUCH (CST816S, I2C)
    ──────────────────────────────────────────────────────────────
-   FPC Pin   Wire colour   GPIO   Function
-   ──────    ────────────  ────   ────────
-     9       Green         0      I2C SDA
-    10       Blue          1      I2C SCL
-    12       Gray          4      INT (active low, deep-sleep wake)
-    16       —            20      Touch reset
+   FPC pad   Signal    ESP32-C6 GPIO   Function
+   ───────   ───────   ─────────────   ────────
+    14       TP_SDA    GPIO4           I2C data
+    13       TP_SCL    GPIO5           I2C clock
+    15       TP_INT    GPIO20          INT (active low; NOT a wake source - C6 LP_IO wake is GPIO0-7)
+    16       TP_RST    GPIO19          Touch reset
+   NOTE: U4 net labels on pads 13/14 are swapped vs the module's own pinout
+   ("TP_SDA" sits on the TP_SCL contact).
    ============================================================ */
-#define PIN_TOUCH_SDA    GPIO_NUM_0   /* FPC 9  (Green)   — I2C data           */
-#define PIN_TOUCH_SCL    GPIO_NUM_1   /* FPC 10 (Blue)    — I2C clock          */
-#define PIN_TOUCH_INT    GPIO_NUM_4   /* FPC 12 (Gray)    — CST816 INT         */
-                                      /* Deep-sleep wake capable (C6: GPIO 0-7) */
-#define PIN_TOUCH_RST    GPIO_NUM_20  /* FPC 16           — Touch reset        */
+#define PIN_TOUCH_SDA    GPIO_NUM_4   /* U4/FPC pad 14 — I2C data              */
+#define PIN_TOUCH_SCL    GPIO_NUM_5   /* U4/FPC pad 13 — I2C clock             */
+#define PIN_TOUCH_INT    GPIO_NUM_20  /* U4/FPC pad 15 — CST816 INT            */
+                                      /* NOT a wake source: C6 LP_IO wake is GPIO0-7 only */
+#define PIN_TOUCH_RST    GPIO_NUM_19  /* U4/FPC pad 16 — Touch reset           */
 
 /* ============================================================
    HARDWARE PINS — PERIPHERALS
    ============================================================ */
-#define PIN_STATUS_LED   GPIO_NUM_8   /* WS2812 RGB status LED                   */
-#define PIN_BUTTON       GPIO_NUM_9   /* Physical button (active low)             */
+#define PIN_STATUS_LED   GPIO_NUM_15  /* WS2812 RGB status LED                   */
+#define PIN_BUTTON       GPIO_NUM_0   /* Physical button (active low)             */
 
 /* ============================================================
    DISPLAY CONFIGURATION  (LCD_H_RES / LCD_V_RES live in ui_config.h)

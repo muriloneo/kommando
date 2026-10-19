@@ -22,7 +22,7 @@
 #include "backlight.h"
 #include "commands.h"
 #include "tiles.h"
-#include "ui_panel.h"
+#include "ui/ui_panel.h"
 #include "led.h"
 
 #include <string.h>

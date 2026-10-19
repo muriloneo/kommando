@@ -1,0 +1,19 @@
+# crg-only ignore — does NOT affect git, ESP-IDF build, CI, or anything else
+# Repo root is /mnt/c/codes/esp32/kommando (firmware/ is one of several components)
+
+# Firmware: keep main/ + build config, drop vendored SDK and generated/superseded code
+firmware/managed_components/**
+firmware/build/**
+firmware/releases/**
+firmware/archive/**
+firmware/simulator/**
+
+# Hardware design (binary KiCad files — not parseable as code)
+ki-kad/**
+
+# Media/binary assets
+assets/**
+
+# Editor/CI noise
+.vscode/**
+.github/hooks/**
